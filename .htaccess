@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# 1. Redirigir la raíz del sitio a la carpeta public/index.php
+RewriteRule ^$ public/index.php [L]
+
+# 2. Si el archivo o carpeta solicitada no existe físicamente en public/,
+# redirigir la petición al index.php de public/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/index.php?url=$1 [L,QSA]

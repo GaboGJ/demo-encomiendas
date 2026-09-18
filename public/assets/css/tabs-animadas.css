@@ -1,0 +1,81 @@
+/* ===================================================
+   Pestañas Animadas Responsive (Estilo Argon Nativo)
+   =================================================== */
+
+/* Contenedor principal personalizado */
+.custom-nav-wrapper {
+  position: relative;
+  background-color: #f8f9fa;
+  padding: 4px;
+  border-radius: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Lista aislada para evitar la intercepción de Argon */
+.custom-nav-wrapper .custom-nav-pills {
+  position: relative;
+  display: flex;
+  margin-bottom: 0;
+  padding-left: 0;
+  list-style: none;
+  width: 100%;
+}
+
+.custom-nav-wrapper .custom-nav-pills .nav-item {
+  flex: 1 1 0%;
+  text-align: center;
+  z-index: 2;
+  min-width: 0;
+}
+
+.custom-nav-wrapper .custom-nav-pills .nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: 0;
+  background: transparent;
+  color: #67748e;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  transition: color 0.3s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.custom-nav-wrapper .custom-nav-pills .nav-link.active {
+  color: #344767 !important;
+  background-color: transparent !important;
+}
+
+/* Pastilla Flotante Animada con soporte 2D (Ejes X e Y) */
+.custom-nav-wrapper .moving-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.16);
+  z-index: 1;
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), width 0.35s cubic-bezier(0.25, 1, 0.5, 1), height 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  pointer-events: none;
+}
+
+/* Disposición Vertical Nativa en Móviles (Menor a 768px) */
+@media (max-width: 767.98px) {
+  .custom-nav-wrapper .custom-nav-pills {
+    flex-direction: column;
+  }
+
+  .custom-nav-wrapper .custom-nav-pills .nav-item {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .custom-nav-wrapper .custom-nav-pills .nav-link {
+    padding: 0.65rem 1rem;
+  }
+}
