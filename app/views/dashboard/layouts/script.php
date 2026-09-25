@@ -4,6 +4,7 @@
   <script src="<?= URL; ?>/public/assets/js/plugins/perfect-scrollbar.min.js"></script>
   <script src="<?= URL; ?>/public/assets/js/plugins/smooth-scrollbar.min.js"></script>
   <script src="<?= URL; ?>/public/assets/js/plugins/chartjs.min.js"></script>
+ <script src="<?= URL; ?>/public/assets/js/tabs-animadas.js"></script>
 
   <!-- JQUERY & DATATABLES SCRIPTS -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -265,6 +266,9 @@
     });
     // Inicializar DataTable para la tabla de reportes
   $(document).ready(function() {
+    inicializarDataTable('#datatable-reportes', { ordering: false, placeholder: 'Buscar en el reporte...' });
+  });
+   $(document).ready(function() {
     inicializarDataTable('#datatable-reportes', { ordering: false, placeholder: 'Buscar en el reporte...' });
   });
 </script>

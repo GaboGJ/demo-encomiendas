@@ -4,20 +4,38 @@ require_once __DIR__ . '/../config/config.php';
 
 // 2. Obtener y limpiar la URL solicitada
 $url = isset($_GET['url']) ? $_GET['url'] : 'auth/auth_controller/index';
+
+// ELIMINAR 'index.php' O 'index.php/' DEL INICIO DE LA URL SI EXISTE
+$url = preg_replace('/^index\.php\/?/', '', $url);
 $url = rtrim($url, '/');
+
+// Si la URL quedó vacía tras limpiar index.php, asignamos la ruta por defecto
+if (empty($url)) {
+    $url = 'auth/auth_controller/index';
+}
+
 $url = explode('/', $url);
 
-// --- REGLAS DE ENRUTAMIENTO INTELIGENTE PARA URLs CORTAS ---
+// --- REGLAS DE ENRUTAMIENTO INTELIGENTE ---
 if (count($url) == 1 && !empty($url[0])) {
-    // Si escribes solo 'dashboard', asumimos carpeta 'dashboard', controlador 'dashboard_controller' y acción 'index'
+    // Si escribes 'dashboard', busca carpeta 'dashboard', controlador 'dashboard_controller' y acción 'index'
     $folder     = $url[0];
     $controller = $url[0] . '_controller'; 
     $action     = 'index';
 } elseif (count($url) == 2) {
-    // Si escribes 'dashboard/perfil', asumimos carpeta 'dashboard', controlador 'perfil_controller' y acción 'index'
+    // Caso A: 'encomiendas/new' -> carpeta 'encomiendas', controlador 'encomiendas_controller', acción 'new'
+    // Caso B: 'dashboard/perfil' -> carpeta 'dashboard', controlador 'perfil_controller', acción 'index'
     $folder     = $url[0];
-    $controller = $url[1] . '_controller';
-    $action     = 'index';
+    
+    // Si el segundo parámetro coincide con el nombre de un archivo controlador habitual (ej: encomiendas_controller)
+    if (strpos($url[1], '_controller') !== false) {
+        $controller = $url[1];
+        $action     = 'index';
+    } else {
+        // Estructura corta: /carpeta/accion (ej: /encomiendas/new)
+        $controller = $url[0] . '_controller';
+        $action     = $url[1];
+    }
 } else {
     // Estructura completa clásica: /carpeta/controlador/accion
     $folder     = isset($url[0]) ? $url[0] : 'auth';                 
@@ -25,8 +43,7 @@ if (count($url) == 1 && !empty($url[0])) {
     $action     = isset($url[2]) ? $url[2] : 'index';                
 }
 
-// Formatear el nombre de la clase (ej: dashboard_controller -> Dashboard_controller)
-// Nota: Si usas guiones bajos, asegurate de capitalizar correctamente si tu clase lo requiere
+// Formatear el nombre de la clase
 $controllerClassName = str_replace(' ', '', $controller);
 
 // 3. Ruta física del archivo usando __DIR__ para el servidor 
@@ -36,22 +53,21 @@ $archivoControlador = __DIR__ . '/../app/controllers/' . $folder . '/' . $contro
 if (file_exists($archivoControlador)) {
     require_once $archivoControlador;
     
-    // Validar si la clase existe dentro del archivo
     if (class_exists($controllerClassName)) {
         $controllerInstance = new $controllerClassName();
         
-        // Verificar si el método (acción) existe en la clase
         if (method_exists($controllerInstance, $action)) {
             $controllerInstance->$action();
         } else {
-            echo "<h1>Error 404</h1><p>La acción '{$action}' solicitada no existe.</p>";
+            http_response_code(404);
+            echo "<h1>Error 404</h1><p>La acción '{$action}' solicitada no existe en el controlador '{$controllerClassName}'.</p>";
         }
     } else {
+        http_response_code(404);
         echo "<h1>Error 404</h1><p>La clase del controlador '{$controllerClassName}' no está definida correctamente.</p>";
     }
 } else {
-    // Si no encuentra el controlador, muestra un mensaje de error limpio
     http_response_code(404);
-    echo "<h1>Error 404</h1><p>El controlador '{$folder}/{$controller}.php' no fue encontrado en el sistema.</p>";
+    echo "<h1>Error 404</h1><p>El controlador '{$folder}/{$controllerClassName}.php' no fue encontrado en el sistema.</p>";
 }
 ?>

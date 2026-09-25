@@ -19,6 +19,7 @@
   <!-- DataTables CSS -->
   <link href="<?= URL; ?>/public/assets/css/vendor/dataTables.bootstrap5.css" rel="stylesheet" type="text/css" />
   <link href="<?= URL; ?>/public/assets/css/vendor/responsive.bootstrap5.css" rel="stylesheet" type="text/css" />
+  <link href="<?= URL; ?>/public/assets/css/tabs-animadas.css" rel="stylesheet" type="text/css" />
 </head>
 
 <body class="g-sidenav-show bg-gray-100">
