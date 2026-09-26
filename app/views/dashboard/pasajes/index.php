@@ -25,7 +25,7 @@
             <h6 class="font-weight-bolder text-dark mb-0">Listado de Pasajes Vendidos</h6>
             <p class="text-xs text-secondary mb-0">Boletos de viaje emitidos en ventanilla para las distintas flotas y rutas.</p>
           </div>
-          <a href="<?= URL ?>pasajes/new" class="btn bg-gradient-success text-white mb-0 border-radius-md px-3 shadow-sm d-inline-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center">
+          <a href="<?= URL ?>/pasajes/new" class="btn bg-gradient-success text-white mb-0 border-radius-md px-3 shadow-sm d-inline-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center">
             <i class="material-symbols-rounded text-sm">add_box</i>
             <span class="font-weight-bold">Vender Nuevo Pasaje</span>
           </a>

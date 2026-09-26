@@ -159,5 +159,94 @@ class Despachos_model {
             ':usuario'         => $data['id_usuario']
         ]);
     }
+
+    /**
+     * Turnos "en turno" (todavía no despachados/cancelados) que salen desde
+     * una sucursal, con los datos de vehículo/modelo/chofer ya resueltos.
+     * Se usa en la venta de pasajes para que el cajero elija el chofer que
+     * está en turno; si no elige ninguno, el pasaje queda "en espera".
+     */
+    public function getTurnosEnTurnoPorSucursal($id_sucursal_origen) {
+        try {
+            $sql = "SELECT 
+                        t.id_turno,
+                        t.precio_pasaje_turno,
+                        t.fecha_salida_turno,
+                        t.hora_salida_turno,
+                        et.nombre_estado_turno,
+                        s_dest.ciudad_sucursal AS ciudad_destino,
+                        s_dest.nombre_sucursal AS nombre_sucursal_destino,
+                        v.id_vehiculo,
+                        v.numero_interno_vehiculo,
+                        v.placa_vehiculo,
+                        mo.id_modelo,
+                        mo.nombre_modelo,
+                        mo.total_asientos_modelo,
+                        CONCAT(p_chof.nombre_persona, ' ', p_chof.apellido_paterno_persona) AS nombre_chofer,
+                        (SELECT COUNT(dp.id_detalle_pasaje)
+                           FROM detalles_pasajes dp
+                          WHERE dp.id_turno = t.id_turno
+                            AND (dp.estado_detalle_pasaje = 1 OR dp.estado_detalle_pasaje IS NULL)) AS asientos_ocupados
+                    FROM turnos t
+                    INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+                    INNER JOIN sucursales s_dest ON t.id_sucursal_destino = s_dest.id_sucursal
+                    INNER JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
+                    INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                    INNER JOIN modelos mo ON v.id_modelo = mo.id_modelo
+                    INNER JOIN choferes ch ON vc.id_chofer = ch.id_chofer
+                    INNER JOIN personas p_chof ON ch.id_persona = p_chof.id_persona
+                    WHERE t.id_sucursal_origen = :id_origen
+                      AND (t.estado_turno = 1 OR t.estado_turno IS NULL)
+                      AND (LOWER(et.nombre_estado_turno) LIKE '%turno%' OR LOWER(et.nombre_estado_turno) = 'pendiente')
+                    ORDER BY t.id_turno DESC";
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([':id_origen' => $id_sucursal_origen]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Un turno puntual con su vehículo/modelo/chofer/ruta resueltos, para
+     * calcular el precio y cargar el plano de asientos correspondiente.
+     */
+    public function obtenerTurnoConVehiculo($id_turno) {
+        try {
+            $sql = "SELECT 
+                        t.id_turno,
+                        t.id_sucursal_origen,
+                        t.id_sucursal_destino,
+                        t.precio_pasaje_turno,
+                        t.fecha_salida_turno,
+                        t.hora_salida_turno,
+                        et.nombre_estado_turno,
+                        s_dest.ciudad_sucursal AS ciudad_destino,
+                        s_dest.nombre_sucursal AS nombre_sucursal_destino,
+                        v.numero_interno_vehiculo,
+                        v.placa_vehiculo,
+                        mo.id_modelo,
+                        mo.nombre_modelo,
+                        mo.total_asientos_modelo,
+                        CONCAT(p_chof.nombre_persona, ' ', p_chof.apellido_paterno_persona) AS nombre_chofer
+                    FROM turnos t
+                    INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+                    INNER JOIN sucursales s_dest ON t.id_sucursal_destino = s_dest.id_sucursal
+                    INNER JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
+                    INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                    INNER JOIN modelos mo ON v.id_modelo = mo.id_modelo
+                    INNER JOIN choferes ch ON vc.id_chofer = ch.id_chofer
+                    INNER JOIN personas p_chof ON ch.id_persona = p_chof.id_persona
+                    WHERE t.id_turno = :id_turno
+                    LIMIT 1";
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([':id_turno' => $id_turno]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
 }
 ?>
