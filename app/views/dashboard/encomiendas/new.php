@@ -1,4 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <div class="container-fluid py-4 flex-grow-1">
   <div class="row">
@@ -215,7 +214,7 @@
               </div>
             </div>
 
-            <!-- PASO 3: TARIFAS Y COBRO (TAB ANIMADO Y BUTTON GROUP) -->
+            <!-- PASO 3: TARIFAS Y COBRO -->
             <div class="wizard-step d-none" id="step-3">
               <div class="d-flex align-items-center mb-3">
                 <span class="material-symbols-rounded text-success me-2">payments</span>
@@ -266,92 +265,92 @@
 
                 <!-- Columna Derecha: Modalidades y Métodos con Pestañas Animadas -->
                 <div class="col-12 col-lg-7">
-                <div class="p-3 border border-radius-md bg-white h-100 d-flex flex-column justify-content-between">
+                  <div class="p-3 border border-radius-md bg-white h-100 d-flex flex-column justify-content-between">
                     <div>
-                    <h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3">Modalidad y Forma de Pago</h6>
-                    
-                    <!-- 1. MODALIDAD DE LIQUIDACIÓN (TAB ANIMADO) -->
-                    <div class="mb-3">
+                      <h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3">Modalidad y Forma de Pago</h6>
+                      
+                      <!-- 1. MODALIDAD DE LIQUIDACIÓN (TAB ANIMADO) -->
+                      <div class="mb-3">
                         <label class="form-label text-xs font-weight-bold mb-1">Forma de Liquidación *</label>
                         <div class="custom-nav-wrapper" id="wrapperModalidad">
-                        <ul class="custom-nav-pills" role="tablist">
+                          <ul class="custom-nav-pills" role="tablist">
                             <li class="nav-item">
-                            <a class="nav-link active" id="tab-contado" data-bs-toggle="tab" href="#content-contado" role="tab" onclick="seleccionarModalidad(1)">
+                              <a class="nav-link active" id="tab-contado" data-bs-toggle="tab" href="#content-contado" role="tab" onclick="seleccionarModalidad('1')">
                                 <i class="material-symbols-rounded text-sm me-1 align-middle">payments</i> Pagado en Origen
-                            </a>
+                              </a>
                             </li>
                             <li class="nav-item">
-                            <a class="nav-link" id="tab-cod" data-bs-toggle="tab" href="#content-cod" role="tab" onclick="seleccionarModalidad(0)">
+                              <a class="nav-link" id="tab-cod" data-bs-toggle="tab" href="#content-cod" role="tab" onclick="seleccionarModalidad('0')">
                                 <i class="material-symbols-rounded text-sm me-1 align-middle">local_shipping</i> Por Cobrar (COD)
-                            </a>
+                              </a>
                             </li>
-                        </ul>
-                        <div class="moving-tab"></div>
+                          </ul>
+                          <div class="moving-tab"></div>
                         </div>
                         <input type="hidden" id="selectModalidadPago" value="1">
-                    </div>
+                      </div>
 
-                    <!-- 2. MÉTODO DE COBRO (TAB ANIMADO GRID) -->
-                    <div class="mb-3" id="secMetodoCobro">
+                      <!-- 2. MÉTODO DE COBRO (TAB ANIMADO GRID) -->
+                      <div class="mb-3" id="secMetodoCobro">
                         <label class="form-label text-xs font-weight-bold mb-1">Método de Cobro (En Origen)</label>
                         <div class="custom-nav-wrapper">
-                        <ul class="custom-nav-pills d-flex flex-wrap gap-1" role="tablist" id="pillsMetodosCobro">
+                          <ul class="custom-nav-pills d-flex flex-wrap gap-1" role="tablist" id="pillsMetodosCobro">
                             <?php if (!empty($metodos_pago)): ?>
-                            <?php foreach ($metodos_pago as $index => $metodo): ?>
+                              <?php foreach ($metodos_pago as $index => $metodo): ?>
                                 <li class="nav-item flex-fill text-center">
-                                <a class="nav-link text-xs py-2 px-2 <?= $index === 0 ? 'active' : '' ?>" 
-                                    id="tab-metodo-<?= $metodo['id_metodo_pago'] ?>" 
-                                    data-bs-toggle="tab" 
-                                    href="#metodo-<?= $metodo['id_metodo_pago'] ?>" 
-                                    role="tab" 
-                                    onclick="actualizarMetodoCobro(<?= $metodo['id_metodo_pago'] ?>)">
+                                  <a class="nav-link text-xs py-2 px-2 <?= $index === 0 ? 'active' : '' ?>" 
+                                     id="tab-metodo-<?= $metodo['id_metodo_pago'] ?>" 
+                                     data-bs-toggle="tab" 
+                                     href="#metodo-<?= $metodo['id_metodo_pago'] ?>" 
+                                     role="tab" 
+                                     onclick="actualizarMetodoCobro('<?= $metodo['id_metodo_pago'] ?>')">
                                     <i class="material-symbols-rounded text-sm me-1 align-middle"><?= !empty($metodo['icono_metodo_pago']) ? $metodo['icono_metodo_pago'] : 'payments' ?></i>
                                     <?= htmlspecialchars($metodo['nombre_metodo_pago']) ?>
-                                </a>
+                                  </a>
                                 </li>
-                            <?php endforeach; ?>
+                              <?php endforeach; ?>
                             <?php else: ?>
-                            <li class="nav-item flex-fill text-center">
-                                <a class="nav-link text-xs py-2 px-2 active" id="tab-metodo-1" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro(1)">
-                                <i class="material-symbols-rounded text-sm me-1 align-middle">payments</i> Efectivo
+                              <li class="nav-item flex-fill text-center">
+                                <a class="nav-link text-xs py-2 px-2 active" id="tab-metodo-1" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro('1')">
+                                  <i class="material-symbols-rounded text-sm me-1 align-middle">payments</i> Efectivo
                                 </a>
-                            </li>
-                            <li class="nav-item flex-fill text-center">
-                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-2" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro(2)">
-                                <i class="material-symbols-rounded text-sm me-1 align-middle">qr_code_2</i> QR
+                              </li>
+                              <li class="nav-item flex-fill text-center">
+                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-2" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro('2')">
+                                  <i class="material-symbols-rounded text-sm me-1 align-middle">qr_code_2</i> QR
                                 </a>
-                            </li>
-                            <li class="nav-item flex-fill text-center">
-                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-3" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro(3)">
-                                <i class="material-symbols-rounded text-sm me-1 align-middle">smartphone</i> Tigo Money
+                              </li>
+                              <li class="nav-item flex-fill text-center">
+                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-3" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro('3')">
+                                  <i class="material-symbols-rounded text-sm me-1 align-middle">smartphone</i> Tigo Money
                                 </a>
-                            </li>
-                            <li class="nav-item flex-fill text-center">
-                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-4" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro(4)">
-                                <i class="material-symbols-rounded text-sm me-1 align-middle">credit_card</i> Tarjeta
+                              </li>
+                              <li class="nav-item flex-fill text-center">
+                                <a class="nav-link text-xs py-2 px-2" id="tab-metodo-4" data-bs-toggle="tab" role="tab" onclick="actualizarMetodoCobro('4')">
+                                  <i class="material-symbols-rounded text-sm me-1 align-middle">credit_card</i> Tarjeta
                                 </a>
-                            </li>
+                              </li>
                             <?php endif; ?>
-                        </ul>
-                        <div class="moving-tab"></div>
+                          </ul>
+                          <div class="moving-tab"></div>
                         </div>
                         <input type="hidden" id="selectMetodoCobro" value="1">
-                    </div>
+                      </div>
                     </div>
 
                     <!-- TARJETA RESUMEN TOTAL -->
                     <div class="p-3 bg-gray-100 border-radius-lg mt-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="text-xs text-secondary">Estado Tarifario:</span>
                         <span class="badge bg-gradient-success text-xxs" id="lblEstadoCalculo">Autocálculo por Bultos</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
+                      </div>
+                      <div class="d-flex justify-content-between align-items-center">
                         <span class="text-xs font-weight-bold text-dark">Total a Cobrar:</span>
                         <h4 class="text-success mb-0 font-weight-bolder" id="lblTotalMonto">Bs. 0.00</h4>
-                    </div>
+                      </div>
                     </div>
 
-                </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -379,7 +378,7 @@
                   </div>
                   <div class="text-start text-sm-end w-100 w-sm-auto">
                     <span class="badge bg-gradient-success text-sm px-3 py-2 mb-1">
-                      GUÍA #<span id="prevGuiaNumero">TRX-2026-8493</span>
+                      GUÍA #<span id="prevGuiaNumero">-- PENDIENTE DE EMISIÓN --</span>
                     </span>
                     <p class="text-xxs text-secondary mb-0" id="prevFechaEmision">Fecha: --/--/----</p>
                   </div>
@@ -429,7 +428,7 @@
                         <div class="d-flex justify-content-center align-items-center" style="width: 120px; height: 120px; margin: 0 auto; background: #fff; border: 2px dashed #344767; border-radius: 8px;">
                           <div class="text-center">
                             <span class="material-symbols-rounded text-dark" style="font-size: 56px;">qr_code_2</span>
-                            <span class="text-xxs font-weight-bold text-dark d-block" id="prevGuiaQrCode">TRX-8493</span>
+                            <span class="text-xxs font-weight-bold text-dark d-block" id="prevGuiaQrCode">PREVIEW</span>
                           </div>
                         </div>
                       </div>
@@ -517,7 +516,7 @@
   </div>
 </div>
 
-<!-- SCRIPTS DE PESTAÑAS ANIMADAS (TAB MOVING) -->
+<!-- SCRIPT PESTAÑAS ANIMADAS -->
 <script>
 function initCustomNavPills() {
   var wrappers = document.querySelectorAll('.custom-nav-wrapper');
@@ -574,56 +573,64 @@ function initCustomNavPills() {
 }
 </script>
 
-<!-- SCRIPTS DE WIZARD, DATATABLES Y EVENTOS -->
+<!-- SCRIPT WIZARD Y DATATABLE -->
 <script>
 let pasoActual = 1;
 let listaBultos = [];
 let dtBultos = null;
 const baseUrl = '<?php echo rtrim(URL, "/"); ?>';
 
-// Inicialización usando tu función global
+function redireccionarAlListado() {
+  window.location.href = baseUrl + '/encomiendas';
+}
+
 function inicializarDataTableBultos() {
   if (dtBultos) return;
   
-  dtBultos = inicializarDataTable('#tablaBultos', {
-    ordering: false,
-    placeholder: 'Buscar bulto...',
-    pageLength: 5,
-    columns: [
-      { data: 'index', className: 'text-xs font-weight-bold' },
-      { data: 'descripcion', className: 'text-xs font-weight-bold' },
-      { data: 'contenido', className: 'text-xs font-weight-bold' },
-      { data: 'peso', className: 'text-center text-xs font-weight-bold' },
-      { data: 'subtotal', className: 'text-end text-xs font-weight-bold' },
-      { data: 'acciones', className: 'text-end', orderable: false }
-    ]
-  });
+  if (typeof inicializarDataTable === 'function') {
+    dtBultos = inicializarDataTable('#tablaBultos', {
+      ordering: false,
+      placeholder: 'Buscar bulto...',
+      pageLength: 5,
+      columns: [
+        { data: 'index', className: 'text-xs font-weight-bold' },
+        { data: 'descripcion', className: 'text-xs font-weight-bold' },
+        { data: 'contenido', className: 'text-xs font-weight-bold' },
+        { data: 'peso', className: 'text-center text-xs font-weight-bold' },
+        { data: 'subtotal', className: 'text-end text-xs font-weight-bold' },
+        { data: 'acciones', className: 'text-end', orderable: false }
+      ]
+    });
+  }
 }
 
-// Renderizado de bultos sobre tu DataTable nativa
 function renderizarBultos() {
   inicializarDataTableBultos();
   
-  dtBultos.clear();
-
-  const dataRows = listaBultos.map((b, i) => {
-    return {
-      index: `Bulto #${i + 1}`,
-      descripcion: b.descripcion,
-      contenido: b.nombre_contenido,
-      peso: b.peso > 0 ? `${b.peso} Kg` : '-',
-      subtotal: `Bs. ${b.subtotal.toFixed(2)}`,
-      acciones: `<button type="button" class="btn btn-link text-danger p-0 m-0" onclick="eliminarBulto(${i})">
-                  <i class="material-symbols-rounded text-sm">delete</i>
-                </button>`
-    };
-  });
-
-  dtBultos.rows.add(dataRows).draw();
+  if (dtBultos) {
+    dtBultos.clear();
+    const dataRows = listaBultos.map((b, i) => {
+      return {
+        index: `Bulto #${i + 1}`,
+        descripcion: b.descripcion,
+        contenido: b.nombre_contenido,
+        peso: b.peso > 0 ? `${b.peso} Kg` : '-',
+        subtotal: `Bs. ${b.subtotal.toFixed(2)}`,
+        acciones: `<button type="button" class="btn btn-link text-danger p-0 m-0" onclick="eliminarBulto(${i})">
+                    <i class="material-symbols-rounded text-sm">delete</i>
+                  </button>`
+      };
+    });
+    dtBultos.rows.add(dataRows).draw();
+  }
 }
 
-function actualizarModalidadSeleccionada(valor) {
+function seleccionarModalidad(valor) {
   document.getElementById('selectModalidadPago').value = valor;
+  const secMetodo = document.getElementById('secMetodoCobro');
+  if (secMetodo) {
+    secMetodo.style.display = (valor === '1' || valor === 1) ? 'block' : 'none';
+  }
 }
 
 function actualizarMetodoCobro(idMetodo) {
@@ -636,8 +643,8 @@ function cambiarPaso(direccion) {
 
   if (pasoActual === 1 && direccion === 1) {
     const destino = document.getElementById('selectDestino').value;
-    const remCi = document.getElementById('remitente_ci').value;
-    const destCi = document.getElementById('destinatario_ci').value;
+    const remCi = document.getElementById('remitente_ci').value.trim();
+    const destCi = document.getElementById('destinatario_ci').value.trim();
 
     if (!destino) {
       Swal.fire({ icon: 'warning', title: 'Atención', text: 'Debe seleccionar una agencia de destino.' });
@@ -687,7 +694,7 @@ function irAlPasoDirecto(paso) {
 
   if (pasoActual === 2) {
     inicializarDataTableBultos();
-    setTimeout(() => { dtBultos.columns.adjust().draw(); }, 100);
+    if (dtBultos) setTimeout(() => { dtBultos.columns.adjust().draw(); }, 100);
   }
 
   if (pasoActual === 3) {
@@ -737,64 +744,39 @@ function agregarBultoDesdeModal() {
   const selectContenido = document.getElementById('modalContenido');
   const idContenido = selectContenido.value;
   
-  const optionSelected = selectContenido.options[selectContenido.selectedIndex];
-  const nombreContenido = optionSelected ? optionSelected.text : '';
-  const pesoVal = document.getElementById('modalPeso').value.trim();
-  const peso = pesoVal !== '' ? parseFloat(pesoVal) : 0;
-  const idDestino = document.getElementById('selectDestino').value;
-
   if (!descripcion || !idContenido) {
     Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Complete la descripción y seleccione un tipo de contenido.' });
     return;
   }
 
-  fetch(`${baseUrl}/encomiendas/obtenerTarifa?id_destino=${idDestino}&id_contenido=${idContenido}`)
-    .then(r => r.json())
-    .then(res => {
-      let subtotal = res.success ? parseFloat(res.precio) : 0;
+  const optionSelected = selectContenido.options[selectContenido.selectedIndex];
+  const nombreContenido = optionSelected ? optionSelected.text.split('- Bs.')[0].trim() : '';
+  const precioTarifa = optionSelected ? parseFloat(optionSelected.getAttribute('data-precio')) || 0 : 0;
 
-      listaBultos.push({
-        descripcion: descripcion,
-        id_contenido: idContenido,
-        nombre_contenido: nombreContenido,
-        peso: peso,
-        subtotal: subtotal
-      });
+  const pesoVal = document.getElementById('modalPeso').value.trim();
+  const peso = pesoVal !== '' ? parseFloat(pesoVal) : 0;
 
-      renderizarBultos();
-      calcularTotalLiquidacion();
+  listaBultos.push({
+    descripcion: descripcion,
+    id_contenido: idContenido,
+    nombre_contenido: nombreContenido,
+    peso: peso,
+    subtotal: precioTarifa
+  });
 
-      document.getElementById('formModalBulto').reset();
-      const modalEl = document.getElementById('modalAgregarBulto');
-      const modalObj = bootstrap.Modal.getInstance(modalEl);
-      if (modalObj) modalObj.hide();
-    });
+  renderizarBultos();
+  calcularTotalLiquidacion();
+
+  document.getElementById('formModalBulto').reset();
+  const modalEl = document.getElementById('modalAgregarBulto');
+  const modalObj = bootstrap.Modal.getInstance(modalEl);
+  if (modalObj) modalObj.hide();
 }
 
 function eliminarBulto(index) {
   listaBultos.splice(index, 1);
   renderizarBultos();
   calcularTotalLiquidacion();
-}
-
-function renderizarBultos() {
-  inicializarDataTableBultos();
-  dtBultos.clear();
-
-  const dataRows = listaBultos.map((b, i) => {
-    return {
-      index: `Bulto #${i + 1}`,
-      descripcion: b.descripcion,
-      contenido: b.nombre_contenido,
-      peso: b.peso > 0 ? `${b.peso} Kg` : '-',
-      subtotal: `Bs. ${b.subtotal.toFixed(2)}`,
-      acciones: `<button type="button" class="btn btn-link text-danger p-0 m-0" onclick="eliminarBulto(${i})">
-                  <i class="material-symbols-rounded text-sm">delete</i>
-                </button>`
-    };
-  });
-
-  dtBultos.rows.add(dataRows).draw();
 }
 
 function calcularTotalLiquidacion() {
@@ -836,84 +818,58 @@ function previsualizarGuiaFisica() {
   document.getElementById('prevGuiaTotalFlete').textContent = document.getElementById('lblTotalMonto').textContent;
 }
 
-function imprimirGuiaDirecta() {
-  window.print();
-}
-
 document.addEventListener('DOMContentLoaded', function() {
   const btnSave = document.getElementById('btnSave');
   if (btnSave) {
     btnSave.addEventListener('click', function() {
-      Swal.fire({
-        title: '¿Confirmar registro?',
-        text: 'Se registrará la encomienda y emitirá el comprobante correlativo.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#4caf50',
-        cancelButtonColor: '#f44336',
-        confirmButtonText: 'Sí, emitir',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          btnSave.disabled = true;
+      btnSave.disabled = true;
 
-          const formData = new FormData();
-          formData.append('id_sucursal_destino', document.getElementById('selectDestino').value);
-          formData.append('remitente_ci', document.getElementById('remitente_ci').value);
-          formData.append('remitente_nombres', document.getElementById('remitente_nombres').value);
-          formData.append('remitente_paterno', document.getElementById('remitente_paterno').value);
-          formData.append('remitente_materno', document.getElementById('remitente_materno').value);
-          formData.append('remitente_celular', document.getElementById('remitente_celular').value);
-          formData.append('remitente_direccion', document.getElementById('remitente_direccion').value);
+      const formData = new FormData();
+      formData.append('id_sucursal_destino', document.getElementById('selectDestino').value);
+      formData.append('remitente_ci', document.getElementById('remitente_ci').value);
+      formData.append('remitente_nombres', document.getElementById('remitente_nombres').value);
+      formData.append('remitente_paterno', document.getElementById('remitente_paterno').value);
+      formData.append('remitente_materno', document.getElementById('remitente_materno').value);
+      formData.append('remitente_celular', document.getElementById('remitente_celular').value);
+      formData.append('remitente_direccion', document.getElementById('remitente_direccion').value);
 
-          formData.append('destinatario_ci', document.getElementById('destinatario_ci').value);
-          formData.append('destinatario_nombres', document.getElementById('destinatario_nombres').value);
-          formData.append('destinatario_paterno', document.getElementById('destinatario_paterno').value);
-          formData.append('destinatario_materno', document.getElementById('destinatario_materno').value);
-          formData.append('destinatario_celular', document.getElementById('destinatario_celular').value);
-          formData.append('destinatario_direccion', document.getElementById('destinatario_direccion').value);
+      formData.append('destinatario_ci', document.getElementById('destinatario_ci').value);
+      formData.append('destinatario_nombres', document.getElementById('destinatario_nombres').value);
+      formData.append('destinatario_paterno', document.getElementById('destinatario_paterno').value);
+      formData.append('destinatario_materno', document.getElementById('destinatario_materno').value);
+      formData.append('destinatario_celular', document.getElementById('destinatario_celular').value);
+      formData.append('destinatario_direccion', document.getElementById('destinatario_direccion').value);
 
-          formData.append('contenido', document.getElementById('inputContenidoGeneral').value);
-          formData.append('monto_seguro', document.getElementById('montoSeguro').value);
-          formData.append('monto_descuento', document.getElementById('montoDescuento').value);
-          formData.append('monto_total', document.getElementById('lblTotalMonto').textContent.replace('Bs. ', ''));
-          formData.append('modalidad_pago', document.getElementById('selectModalidadPago').value);
-          formData.append('metodo_cobro', document.getElementById('selectMetodoCobro').value);
-          formData.append('bultos_json', JSON.stringify(listaBultos));
+      formData.append('contenido', document.getElementById('inputContenidoGeneral').value);
+      formData.append('monto_seguro', document.getElementById('montoSeguro').value);
+      formData.append('monto_descuento', document.getElementById('montoDescuento').value);
+      formData.append('monto_total', document.getElementById('lblTotalMonto').textContent.replace('Bs. ', ''));
+      formData.append('modalidad_pago', document.getElementById('selectModalidadPago').value);
+      formData.append('metodo_cobro', document.getElementById('selectMetodoCobro').value);
+      formData.append('bultos_json', JSON.stringify(listaBultos));
 
-          fetch(baseUrl + '/encomiendas/guardar', {
-            method: 'POST',
-            body: formData
-          })
-          .then(response => response.json())
-          .then(res => {
-            if (res.success) {
-              document.getElementById('prevGuiaNumero').textContent = res.guia;
-              document.getElementById('prevGuiaQrCode').textContent = res.guia;
-              Swal.fire({
-                icon: 'success',
-                title: '¡Registrado Exitosamente!',
-                text: 'Guía N°: ' + res.guia,
-                showCancelButton: true,
-                confirmButtonText: 'Imprimir Guía',
-                cancelButtonText: 'Ir a Lista'
-              }).then((resPrint) => {
-                if (resPrint.isConfirmed) {
-                  window.print();
-                }
-                window.location.href = baseUrl + '/encomiendas';
-              });
-            } else {
-              Swal.fire('Error', res.message, 'error');
-              btnSave.disabled = false;
-            }
-          })
-          .catch(error => {
-            Swal.fire('Error', 'Error de conexión: ' + error, 'error');
-            btnSave.disabled = false;
-          });
-        }
-      });
+fetch(baseUrl + '/encomiendas/guardar', {
+    method: 'POST',
+    body: formData
+})
+.then(response => response.json())
+.then(res => {
+    if (res.success && res.id_encomienda) {
+        // El mensaje de éxito ya quedó encolado en el servidor (Flash::set dentro de
+        // Encomiendas_controller::guardar()) y se mostrará solo al llegar al listado,
+        // así que aquí no hace falta ningún Swal: solo imprimir y redirigir.
+        imprimirGuiaEncomienda(res.id_encomienda, redireccionarAlListado);
+    } else {
+        // Sin navegación de por medio: se muestra de inmediato
+        Swal.fire('Error al guardar', res.message || 'Error al guardar la encomienda', 'error');
+        btnSave.disabled = false;
+    }
+})
+.catch(err => {
+    console.error(err);
+    Swal.fire('Error', 'Ocurrió un error en el servidor', 'error');
+    btnSave.disabled = false;
+});
     });
   }
 });

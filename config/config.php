@@ -4,6 +4,9 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
+// Helpers globales (disponibles en todos los controladores sin volver a incluirlos)
+require_once __DIR__ . '/../app/helpers/Flash.php';
+
 // Configuración de la Base de Datos
 define('SERVIDOR', 'localhost');
 define('USUARIO', 'root');

@@ -10,7 +10,13 @@
           </div>
         </div>
       </footer>
-    
+
+  <?php
+    // Muestra (si existe) el mensaje SweetAlert que haya quedado encolado por un
+    // controlador (ej. Encomiendas_controller::guardar()) y lo limpia de la sesión.
+    Flash::render();
+  ?>
+
   </main>
 
   <!-- PANEL CONFIGURATOR -->
@@ -64,5 +70,3 @@
       </div>
     </div>
   </div>
-
-  

@@ -12,6 +12,64 @@
   <script src="<?= URL; ?>/public/assets/js/vendor/dataTables.bootstrap5.js"></script>
   <script src="<?= URL; ?>/public/assets/js/vendor/dataTables.responsive.min.js"></script>
 
+<!-- FUNCIÓN GLOBAL DE IMPRESIÓN REUTILIZABLE -->
+<script>
+    /**
+     * Imprime la Guía de encomienda usando el iframe oculto
+     */
+    function imprimirGuiaEncomienda(idEncomienda, onFinish) {
+        if (!idEncomienda) return;
+        const url = '<?= URL ?>/encomiendas/imprimir?id=' + idEncomienda;
+        lanzarImpresionIframe(url, onFinish);
+    }
+
+    /**
+     * Imprime el Acta de Entrega usando el mismo iframe oculto
+     */
+    function imprimirActaEntrega(idEncomienda, onFinish) {
+        if (!idEncomienda) return;
+        const url = '<?= URL ?>/encomiendas/imprimirActa?id=' + idEncomienda;
+        lanzarImpresionIframe(url, onFinish);
+    }
+
+    /**
+     * Función interna que administra la carga en el iframe y el disparo de print()
+     */
+    function lanzarImpresionIframe(url, onFinish) {
+        let iframe = document.getElementById('iframeImpresionGlobal');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'iframeImpresionGlobal';
+            iframe.style.position = 'fixed';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(iframe);
+        }
+
+        iframe.onload = function () {
+            const ventana = iframe.contentWindow;
+            if (!ventana) return;
+
+            ventana.onafterprint = function () {
+                if (typeof onFinish === 'function') onFinish();
+            };
+
+            try {
+                ventana.focus();
+                ventana.print();
+            } catch (e) {
+                console.error('No se pudo abrir el diálogo de impresión:', e);
+            }
+        };
+
+        iframe.src = url;
+    }
+</script>
+  
   <script>
     var ctx = document.getElementById("chart-bars").getContext("2d");
     new Chart(ctx, {

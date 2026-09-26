@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/detail.php'; ?>
 <!-- CONTENEDOR PRINCIPAL -->
 <div class="container-fluid py-4 flex-grow-1">
 
@@ -111,9 +112,17 @@
                                                     </td>
                                                     <td class="align-middle text-end py-3 pe-4 pe-md-5 ps-4">
                                                         <div class="d-flex align-items-center justify-content-end gap-1">
-                                                            <a href="javascript:;" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Ver Detalles"><i class="material-symbols-rounded text-sm">visibility</i></a>
-                                                            <a href="javascript:;" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Imprimir Guía"><i class="material-symbols-rounded text-sm">print</i></a>
-                                                            <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Anular Guía"><i class="material-symbols-rounded text-sm">delete</i></a>
+                                                            <button type="button" class="btn btn-link text-info p-0 m-0 me-2" title="Ver Detalle" onclick="verDetalleEncomienda(<?= $envio['id_encomienda'] ?>)">
+                                                                <i class="material-symbols-rounded text-lg">visibility</i>
+                                                            </button>
+                                                            <button type="button" 
+                                                                    onclick="imprimirGuiaEncomienda(<?= $envio['id_encomienda'] ?>)" 
+                                                                    class="btn btn-link text-success p-2 mb-0" 
+                                                                    data-bs-toggle="tooltip" 
+                                                                    title="Imprimir Guía">
+                                                                <i class="material-symbols-rounded text-sm">print</i>
+                                                            </button>                                                       
+                                                            <!-- <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Anular Guía"><i class="material-symbols-rounded text-sm">delete</i></a> -->
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -140,7 +149,7 @@
                                 <h6 class="font-weight-bolder text-dark mb-0">Listado de Encomiendas Recibidas</h6>
                                 <p class="text-xs text-secondary mb-0">Carga arribada desde otras ciudades lista para entrega o despacho local.</p>
                             </div>
-                            <a href="<?= URL ?>/encomiendas/recepcion" class="btn bg-gradient-success text-white mb-0 border-radius-md px-3 shadow-sm d-inline-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center">
+                            <a href="<?= URL ?>/encomiendas/reception" class="btn bg-gradient-success text-white mb-0 border-radius-md px-3 shadow-sm d-inline-flex align-items-center gap-2 w-100 w-sm-auto justify-content-center">
                                 <i class="material-symbols-rounded text-sm">move_to_inbox</i>
                                 <span class="font-weight-bold">Nueva Recepción</span>
                             </a>
@@ -202,15 +211,26 @@
                                                     </td>
                                                     <td class="align-middle text-end py-3 pe-4 pe-md-5 ps-4">
                                                         <div class="d-flex align-items-center justify-content-end gap-1">
+                                                            <!-- Ver Detalle siempre visible -->
+                                                            <button type="button" class="btn btn-link text-info p-0 m-0 me-2" title="Ver Detalle" onclick="verDetalleEncomienda(<?= $llegada['id_encomienda'] ?>)">
+                                                                <i class="material-symbols-rounded text-lg">visibility</i>
+                                                            </button>
+
                                                             <?php if ($estadoRec === 'entregado'): ?>
-                                                                <a href="javascript:;" class="btn btn-link text-success p-2 mb-0 opacity-5" data-bs-toggle="tooltip" title="Ya Entregado"><i class="material-symbols-rounded text-sm">task_alt</i></a>
+                                                                <!-- Si ya está entregado: Botón para Imprimir Acta de Entrega -->
+                                                                <button type="button" 
+                                                                        onclick="imprimirActaEntrega(<?= $llegada['id_encomienda'] ?>)" 
+                                                                        class="btn btn-link text-success p-2 mb-0" 
+                                                                        data-bs-toggle="tooltip" 
+                                                                        title="Imprimir Acta de Entrega">
+                                                                    <i class="material-symbols-rounded text-sm">print</i>
+                                                                </button>
                                                             <?php else: ?>
-                                                                <a href="<?= URL ?>/encomiendas/entregas/<?= $llegada['id_encomienda'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Registrar Entrega al Destinatario">
+                                                                <!-- Si NO está entregado: Botón para Registrar Entrega -->
+                                                                <a href="<?= URL ?>/encomiendas/delivery?id=<?= $llegada['id_encomienda'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Registrar Entrega al Destinatario">
                                                                     <i class="material-symbols-rounded text-sm">how_to_reg</i>
                                                                 </a>
                                                             <?php endif; ?>
-                                                            <a href="javascript:;" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Ver Detalles"><i class="material-symbols-rounded text-sm">visibility</i></a>
-                                                            <a href="javascript:;" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Imprimir Comprobante"><i class="material-symbols-rounded text-sm">print</i></a>
                                                         </div>
                                                     </td>
                                                 </tr>
