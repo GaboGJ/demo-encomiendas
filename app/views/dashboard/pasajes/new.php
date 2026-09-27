@@ -208,15 +208,21 @@
                 </div>
                 <p class="text-xxs text-secondary mb-3">Haga clic sobre un asiento disponible para seleccionarlo. Los asientos en gris ya fueron vendidos en este turno.</p>
 
-                <!-- Tabs de Piso (solo se muestran si el vehículo tiene más de un piso) -->
-                <div class="custom-nav-wrapper mb-3 d-none" id="wrapperPisosAsientos">
-                  <ul class="custom-nav-pills d-flex flex-wrap gap-1" role="tablist" id="pillsPisosAsientos"></ul>
-                </div>
-
                 <div class="p-3 border border-radius-md bg-white">
                   <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
                     <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
                   </div>
+                </div>
+
+                <!-- Paginador de Piso (solo se muestra si el vehículo tiene más de un piso) -->
+                <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
+                  <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
+                    <i class="material-symbols-rounded text-sm">chevron_left</i>
+                  </button>
+                  <span class="text-xs font-weight-bold text-dark" id="lblPisoActual">Piso 1 de 1</span>
+                  <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoSiguiente" onclick="cambiarPisoPaginador(1)">
+                    <i class="material-symbols-rounded text-sm">chevron_right</i>
+                  </button>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center p-3 bg-gray-100 border-radius-lg mt-3">
@@ -573,6 +579,8 @@ function cargarAsientosTurno() {
       pisosPlano     = res.pisos || [];
       elementosPlano = res.elementos || [];
 
+      normalizarOrientacionHorizontal();
+
       // Al recargar (por ejemplo, al volver a este paso), se descarta de la
       // selección cualquier asiento que ya no exista o que haya sido vendido
       // por otro cajero mientras tanto, para no enviar datos obsoletos.
@@ -590,7 +598,7 @@ function cargarAsientosTurno() {
       }
 
       pisoActivoPlano = pisosPlano[0].id_piso;
-      renderizarTabsPisos();
+      actualizarPaginadorPisos();
       renderizarPlanoPiso();
       recalcularTotalAsientos();
     })
@@ -599,34 +607,42 @@ function cargarAsientosTurno() {
     });
 }
 
-function renderizarTabsPisos() {
+// Muestra el paginador de piso solo cuando el vehículo tiene más de un piso,
+// actualiza la etiqueta "Piso X de N" y habilita/deshabilita las flechas en
+// los extremos (primer y último piso).
+function actualizarPaginadorPisos() {
   const wrapper = document.getElementById('wrapperPisosAsientos');
-  const pills = document.getElementById('pillsPisosAsientos');
+  const lbl = document.getElementById('lblPisoActual');
+  const btnAnterior = document.getElementById('btnPisoAnterior');
+  const btnSiguiente = document.getElementById('btnPisoSiguiente');
 
   if (pisosPlano.length <= 1) {
+    wrapper.classList.remove('d-flex');
     wrapper.classList.add('d-none');
-    pills.innerHTML = '';
     return;
   }
 
-  wrapper.classList.remove('d-none');
-  pills.innerHTML = pisosPlano.map((piso, i) => {
-    const etiqueta = piso.nombre_piso ? piso.nombre_piso : ('Piso ' + piso.numero_piso);
-    return `<li class="nav-item flex-fill text-center">
-              <a class="nav-link text-xs py-2 px-2 ${piso.id_piso === pisoActivoPlano ? 'active' : ''}"
-                 href="javascript:;" onclick="cambiarPisoPlano(${piso.id_piso}, this)">${escaparHtmlAsientos(etiqueta)}</a>
-            </li>`;
-  }).join('');
+  const indiceActual = pisosPlano.findIndex(p => p.id_piso === pisoActivoPlano);
+  const piso = pisosPlano[indiceActual];
+  const etiqueta = piso.nombre_piso ? piso.nombre_piso : ('Piso ' + piso.numero_piso);
 
-  initCustomNavPills();
+  wrapper.classList.remove('d-none');
+  wrapper.classList.add('d-flex');
+  lbl.textContent = `${etiqueta} (${indiceActual + 1} de ${pisosPlano.length})`;
+
+  btnAnterior.disabled = (indiceActual <= 0);
+  btnSiguiente.disabled = (indiceActual >= pisosPlano.length - 1);
 }
 
-function cambiarPisoPlano(idPiso, elLink) {
-  pisoActivoPlano = idPiso;
+// Avanza/retrocede de piso con el paginador (delta: -1 anterior, 1 siguiente).
+function cambiarPisoPaginador(delta) {
+  const indiceActual = pisosPlano.findIndex(p => p.id_piso === pisoActivoPlano);
+  const nuevoIndice = indiceActual + delta;
 
-  document.querySelectorAll('#pillsPisosAsientos .nav-link').forEach(l => l.classList.remove('active'));
-  if (elLink) elLink.classList.add('active');
+  if (nuevoIndice < 0 || nuevoIndice >= pisosPlano.length) return;
 
+  pisoActivoPlano = pisosPlano[nuevoIndice].id_piso;
+  actualizarPaginadorPisos();
   renderizarPlanoPiso();
 }
 
@@ -659,20 +675,19 @@ function renderizarPlanoPiso() {
   let filas    = Math.max(1, parseInt(piso.filas_piso) || 1);
   let columnas = Math.max(1, parseInt(piso.columnas_piso) || 1);
 
-  // Red de seguridad: si algún elemento cae fuera de las dimensiones
-  // declaradas del piso (dato desactualizado), se expande la grilla en vez
-  // de recortarlo, para que todos los asientos configurados sean visibles.
   elementosPiso.forEach(el => {
     filas    = Math.max(filas, parseInt(el.fila_elemento) + 1);
     columnas = Math.max(columnas, parseInt(el.columna_elemento) + 1);
   });
 
-  let html = `<div class="d-flex justify-content-between align-items-center mb-2 px-1">
-                <span class="badge bg-gradient-dark text-xxs">${piso.nombre_piso ? escaparHtmlAsientos(piso.nombre_piso) : ('Piso ' + piso.numero_piso)}</span>
-                <span class="text-xxs text-secondary font-weight-bold">Frente ➔ Fondo</span>
+  let html = `<div class="d-flex justify-content-between align-items-center mb-3 px-2 pb-2 border-bottom">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge bg-gradient-dark">${piso.nombre_piso ? escaparHtmlAsientos(piso.nombre_piso) : ('Piso ' + piso.numero_piso)}</span>
+                  <span class="text-xs text-secondary font-weight-bold">Frente (Izquierda) ➔ Fondo (Derecha)</span>
+                </div>
               </div>`;
 
-  html += `<div class="grid-asientos-piso" style="grid-template-columns: repeat(${columnas}, 54px); grid-template-rows: repeat(${filas}, 54px);">`;
+  html += `<div class="grid-asientos-piso" style="grid-template-columns: repeat(${columnas}, 60px); grid-template-rows: repeat(${filas}, 60px);">`;
 
   for (let r = 0; r < filas; r++) {
     for (let c = 0; c < columnas; c++) {
@@ -701,11 +716,7 @@ function renderizarPlanoPiso() {
                   </div>`;
       } else {
         const esPasillo = (el.tipo_elemento || '').toLowerCase().indexOf('pasillo') !== -1;
-
         if (esPasillo) {
-          // El pasillo es espacio de circulación, no un objeto: se deja en
-          // blanco (sin borde ni icono) para que se lea como un corredor
-          // real dentro del plano, en vez de otra celda "especial" más.
           html += `<div class="celda-elemento celda-pasillo" style="${estilo}" title="Pasillo"></div>`;
         } else {
           const icono = iconoElementoEspecial(el.tipo_elemento);
@@ -721,11 +732,35 @@ function renderizarPlanoPiso() {
   }
 
   html += `</div>`;
-  html += `<div class="text-center mt-2 pt-2 border-top">
-             <span class="text-xxs text-uppercase text-secondary font-weight-bolder">=== Parte Posterior ===</span>
+  html += `<div class="mt-3 pt-2 border-top text-center">
+             <span class="text-xxs text-uppercase text-secondary font-weight-bolder">=== Parte Posterior / Salida de Emergencia ===</span>
            </div>`;
 
   contenedor.innerHTML = html;
+}
+
+// Si el piso quedó configurado más "alto" que "ancho" (más filas que
+// columnas), se transpone fila<->columna para que el plano SIEMPRE se
+// vea horizontalmente orientado, como un vehículo real (más largo que
+// ancho), sin depender de cómo se haya cargado la configuración original.
+function normalizarOrientacionHorizontal() {
+  pisosPlano.forEach(piso => {
+    const filas    = parseInt(piso.filas_piso) || 1;
+    const columnas = parseInt(piso.columnas_piso) || 1;
+
+    if (filas > columnas) {
+      piso.filas_piso    = columnas;
+      piso.columnas_piso = filas;
+
+      elementosPlano
+        .filter(el => el.id_piso === piso.id_piso)
+        .forEach(el => {
+          const filaOriginal = el.fila_elemento;
+          el.fila_elemento    = el.columna_elemento;
+          el.columna_elemento = filaOriginal;
+        });
+    }
+  });
 }
 
 function toggleAsiento(idElemento, ocupado) {

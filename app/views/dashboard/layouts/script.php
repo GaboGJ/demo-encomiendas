@@ -31,6 +31,14 @@
         const url = '<?= URL ?>/encomiendas/imprimirActa?id=' + idEncomienda;
         lanzarImpresionIframe(url, onFinish);
     }
+        /**
+     * Imprime el Boleto de pasaje usando el mismo iframe oculto
+     */
+    function imprimirBoletoPasaje(idPasaje, onFinish) {
+        if (!idPasaje) return;
+        const url = '<?= URL ?>/pasajes/imprimir?id=' + idPasaje;
+        lanzarImpresionIframe(url, onFinish);
+    }
 
     /**
      * Función interna que administra la carga en el iframe y el disparo de print()
