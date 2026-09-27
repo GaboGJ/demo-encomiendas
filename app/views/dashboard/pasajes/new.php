@@ -195,27 +195,27 @@
 
               <!-- Panel de asientos: visible si hay turno seleccionado -->
               <div id="panelAsientos" class="d-none">
-                <div class="d-flex align-items-center mb-2">
-                  <span class="material-symbols-rounded text-success me-2">event_seat</span>
-                  <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Estado y Selección de Asientos del Vehículo</h6>
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
+                  <div class="d-flex align-items-center">
+                    <span class="material-symbols-rounded text-success me-2">event_seat</span>
+                    <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Plano del Vehículo y Selección de Asientos</h6>
+                  </div>
+                  <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-disponible"></span> Disponible</span>
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-seleccionado"></span> Seleccionado</span>
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-ocupado"></span> Ocupado</span>
+                  </div>
                 </div>
-                <p class="text-xxs text-secondary mb-3">Los asientos "Ocupados" ya fueron vendidos en este turno y no se pueden seleccionar.</p>
+                <p class="text-xxs text-secondary mb-3">Haga clic sobre un asiento disponible para seleccionarlo. Los asientos en gris ya fueron vendidos en este turno.</p>
+
+                <!-- Tabs de Piso (solo se muestran si el vehículo tiene más de un piso) -->
+                <div class="custom-nav-wrapper mb-3 d-none" id="wrapperPisosAsientos">
+                  <ul class="custom-nav-pills d-flex flex-wrap gap-1" role="tablist" id="pillsPisosAsientos"></ul>
+                </div>
 
                 <div class="p-3 border border-radius-md bg-white">
-                  <div class="table-responsive p-0" style="max-height: 420px; overflow-y: auto;">
-                    <table class="table align-items-center mb-0 w-100">
-                      <thead>
-                        <tr>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Sel.</th>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Nº Asiento</th>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Estado</th>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Pasajero</th>
-                        </tr>
-                      </thead>
-                      <tbody id="contenedorAsientos">
-                        <tr><td colspan="4" class="text-center text-xs text-secondary py-3">Cargando asientos...</td></tr>
-                      </tbody>
-                    </table>
+                  <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
+                    <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
                   </div>
                 </div>
 
@@ -353,6 +353,81 @@
   </div>
 </div>
 
+<!-- ESTILOS DEL PLANO VISUAL DE ASIENTOS (mismo lenguaje visual que "Configuración de Asientos") -->
+<style>
+  .vehicle-blueprint-horizontal {
+    border: 4px solid #344767 !important;
+    border-radius: 20px 40px 40px 20px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+    min-height: 140px;
+  }
+  .grid-asientos-piso {
+    display: grid;
+    gap: 8px;
+    justify-content: center;
+    margin: 12px auto;
+  }
+  .celda-elemento {
+    width: 54px;
+    height: 54px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .celda-asiento {
+    background: #fff;
+    border: 2px solid #2dce89;
+    color: #2dce89;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    flex-direction: column;
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+  .celda-asiento:hover {
+    background: rgba(45, 206, 137, 0.08);
+    transform: translateY(-1px);
+  }
+  .celda-asiento.seleccionado {
+    background: #2dce89;
+    border-color: #2dce89;
+    color: #fff;
+  }
+  .celda-asiento.ocupado {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    color: #6c757d;
+    cursor: not-allowed;
+  }
+  .celda-asiento.ocupado:hover {
+    transform: none;
+  }
+  .celda-especial {
+    background: #f8f9fa;
+    border: 1px dashed #adb5bd;
+    color: #6c757d;
+    font-size: 0.6rem;
+    text-align: center;
+    line-height: 1.1;
+    padding: 2px;
+  }
+  .celda-pasillo {
+    background: transparent;
+    border: none;
+  }
+  .leyenda-punto {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+  }
+  .leyenda-disponible { background: #fff; border: 2px solid #2dce89; }
+  .leyenda-seleccionado { background: #2dce89; }
+  .leyenda-ocupado { background: #e9ecef; border: 2px solid #adb5bd; }
+</style>
+
 <!-- SCRIPT PESTAÑAS ANIMADAS (mismo patrón que encomiendas/new.php) -->
 <script>
 function initCustomNavPills() {
@@ -404,6 +479,12 @@ let pasoActual = 1;
 let turnoSeleccionado = null; // { id, precio, id_modelo, destino, vehiculo, chofer, capacidad, ocupados }
 const baseUrl = '<?php echo rtrim(URL, "/"); ?>';
 
+// --- Estado del plano visual de asientos ---
+let pisosPlano = [];              // [{ id_piso, numero_piso, filas_piso, columnas_piso }, ...]
+let elementosPlano = [];          // Todos los elementos (asientos + especiales) del modelo
+let pisoActivoPlano = null;       // id_piso actualmente visible en el plano
+let asientosSeleccionados = new Set(); // id_elemento de los asientos elegidos (persiste entre pisos)
+
 function redireccionarAlListado() {
   window.location.href = baseUrl + '/pasajes';
 }
@@ -431,6 +512,12 @@ function onCambioTurno() {
   const sel = document.getElementById('selectTurno');
   const infoTurno = document.getElementById('infoTurnoSeleccionado');
   const panelEnEspera = document.getElementById('panelEnEspera');
+
+  // Cambiar de turno invalida cualquier selección de asientos previa.
+  asientosSeleccionados.clear();
+  pisosPlano = [];
+  elementosPlano = [];
+  pisoActivoPlano = null;
 
   if (!sel.value) {
     turnoSeleccionado = null;
@@ -466,64 +553,204 @@ function recalcularTotalEnEspera() {
   document.getElementById('lblTotalEsperaResumen').textContent = 'Bs. ' + (cant * precio).toFixed(2);
 }
 
-// --- Carga del mapa de asientos (paso 2, con turno seleccionado) ---
+// --- Carga del plano visual del vehículo (paso 2, con turno seleccionado) ---
 function cargarAsientosTurno() {
-  const cont = document.getElementById('contenedorAsientos');
-  cont.innerHTML = '<tr><td colspan="4" class="text-center text-xs text-secondary py-3">Cargando asientos...</td></tr>';
+  const mensaje = document.getElementById('mensajePlanoAsientos');
+  const contenedor = document.getElementById('contenedorPlanoAsientos');
+  if (mensaje) mensaje.textContent = 'Cargando plano del vehículo...';
+  contenedor.innerHTML = '<div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>';
 
   fetch(`${baseUrl}/pasajes/obtenerConfiguracionTurno?id_turno=${turnoSeleccionado.id}`)
     .then(r => r.json())
     .then(res => {
       if (!res.success) {
-        cont.innerHTML = `<tr><td colspan="4" class="text-center text-xs text-danger py-3">${res.message}</td></tr>`;
+        contenedor.innerHTML = `<div class="text-center text-xs text-danger py-4">${res.message}</div>`;
         return;
       }
       turnoSeleccionado.precio = parseFloat(res.turno.precio_pasaje_turno) || turnoSeleccionado.precio;
       document.getElementById('lblInfoPrecio').textContent = 'Bs. ' + turnoSeleccionado.precio.toFixed(2);
-      renderizarTablaAsientos(res.asientos || []);
+
+      pisosPlano     = res.pisos || [];
+      elementosPlano = res.elementos || [];
+
+      // Al recargar (por ejemplo, al volver a este paso), se descarta de la
+      // selección cualquier asiento que ya no exista o que haya sido vendido
+      // por otro cajero mientras tanto, para no enviar datos obsoletos.
+      const idsValidos = new Set(
+        elementosPlano.filter(e => e.es_asiento && !e.ocupado).map(e => String(e.id_elemento))
+      );
+      asientosSeleccionados.forEach(id => {
+        if (!idsValidos.has(String(id))) asientosSeleccionados.delete(id);
+      });
+
+      if (!pisosPlano.length) {
+        contenedor.innerHTML = '<div class="text-center text-xs text-secondary py-4">Este modelo de vehículo no tiene un plano de asientos configurado.</div>';
+        recalcularTotalAsientos();
+        return;
+      }
+
+      pisoActivoPlano = pisosPlano[0].id_piso;
+      renderizarTabsPisos();
+      renderizarPlanoPiso();
+      recalcularTotalAsientos();
     })
     .catch(() => {
-      cont.innerHTML = '<tr><td colspan="4" class="text-center text-xs text-danger py-3">Error al cargar los asientos.</td></tr>';
+      contenedor.innerHTML = '<div class="text-center text-xs text-danger py-4">Error al cargar el plano del vehículo.</div>';
     });
 }
 
-function renderizarTablaAsientos(asientos) {
-  const cont = document.getElementById('contenedorAsientos');
+function renderizarTabsPisos() {
+  const wrapper = document.getElementById('wrapperPisosAsientos');
+  const pills = document.getElementById('pillsPisosAsientos');
 
-  if (!asientos.length) {
-    cont.innerHTML = '<tr><td colspan="4" class="text-center text-xs text-secondary py-3">Este modelo de vehículo no tiene asientos configurados.</td></tr>';
-    recalcularTotalAsientos();
+  if (pisosPlano.length <= 1) {
+    wrapper.classList.add('d-none');
+    pills.innerHTML = '';
     return;
   }
 
-  let html = '';
-  asientos.forEach(a => {
-    const ocupado = !!a.id_detalle_pasaje;
-    html += `<tr>
-      <td class="align-middle ps-2">
-        <div class="form-check mb-0">
-          <input class="form-check-input asiento-check" type="checkbox" value="${a.id_elemento}" ${ocupado ? 'disabled' : ''} onchange="recalcularTotalAsientos()">
-        </div>
-      </td>
-      <td class="align-middle"><span class="text-xs font-weight-bold text-dark">Asiento ${a.dato_elemento}</span></td>
-      <td class="align-middle">${ocupado ? '<span class="badge bg-gradient-secondary text-xxs">Ocupado</span>' : '<span class="badge bg-gradient-success text-xxs">Disponible</span>'}</td>
-      <td class="align-middle"><span class="text-xs text-secondary">${a.pasajero_nombre ? a.pasajero_nombre : '-'}</span></td>
-    </tr>`;
+  wrapper.classList.remove('d-none');
+  pills.innerHTML = pisosPlano.map((piso, i) => {
+    const etiqueta = piso.nombre_piso ? piso.nombre_piso : ('Piso ' + piso.numero_piso);
+    return `<li class="nav-item flex-fill text-center">
+              <a class="nav-link text-xs py-2 px-2 ${piso.id_piso === pisoActivoPlano ? 'active' : ''}"
+                 href="javascript:;" onclick="cambiarPisoPlano(${piso.id_piso}, this)">${escaparHtmlAsientos(etiqueta)}</a>
+            </li>`;
+  }).join('');
+
+  initCustomNavPills();
+}
+
+function cambiarPisoPlano(idPiso, elLink) {
+  pisoActivoPlano = idPiso;
+
+  document.querySelectorAll('#pillsPisosAsientos .nav-link').forEach(l => l.classList.remove('active'));
+  if (elLink) elLink.classList.add('active');
+
+  renderizarPlanoPiso();
+}
+
+function escaparHtmlAsientos(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function iconoElementoEspecial(tipo) {
+  const t = (tipo || '').toLowerCase();
+  if (t.indexOf('chofer') !== -1) return 'directions_car';
+  if (t.indexOf('baño') !== -1 || t.indexOf('bano') !== -1) return 'wc';
+  if (t.indexOf('escalera') !== -1) return 'stairs';
+  if (t.indexOf('televis') !== -1) return 'tv';
+  if (t.indexOf('puerta') !== -1) return 'sensor_door';
+  return 'square';
+}
+
+function renderizarPlanoPiso() {
+  const contenedor = document.getElementById('contenedorPlanoAsientos');
+  const piso = pisosPlano.find(p => p.id_piso === pisoActivoPlano);
+
+  if (!piso) {
+    contenedor.innerHTML = '<div class="text-center text-xs text-secondary py-4">Piso no encontrado.</div>';
+    return;
+  }
+
+  const elementosPiso = elementosPlano.filter(e => e.id_piso === piso.id_piso);
+  let filas    = Math.max(1, parseInt(piso.filas_piso) || 1);
+  let columnas = Math.max(1, parseInt(piso.columnas_piso) || 1);
+
+  // Red de seguridad: si algún elemento cae fuera de las dimensiones
+  // declaradas del piso (dato desactualizado), se expande la grilla en vez
+  // de recortarlo, para que todos los asientos configurados sean visibles.
+  elementosPiso.forEach(el => {
+    filas    = Math.max(filas, parseInt(el.fila_elemento) + 1);
+    columnas = Math.max(columnas, parseInt(el.columna_elemento) + 1);
   });
 
-  cont.innerHTML = html;
+  let html = `<div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                <span class="badge bg-gradient-dark text-xxs">${piso.nombre_piso ? escaparHtmlAsientos(piso.nombre_piso) : ('Piso ' + piso.numero_piso)}</span>
+                <span class="text-xxs text-secondary font-weight-bold">Frente ➔ Fondo</span>
+              </div>`;
+
+  html += `<div class="grid-asientos-piso" style="grid-template-columns: repeat(${columnas}, 54px); grid-template-rows: repeat(${filas}, 54px);">`;
+
+  for (let r = 0; r < filas; r++) {
+    for (let c = 0; c < columnas; c++) {
+      const el = elementosPiso.find(e => parseInt(e.fila_elemento) === r && parseInt(e.columna_elemento) === c);
+      const estilo = `grid-column: ${c + 1}; grid-row: ${r + 1};`;
+
+      if (!el) {
+        html += `<div class="celda-elemento" style="${estilo}"></div>`;
+        continue;
+      }
+
+      if (el.es_asiento) {
+        const seleccionado = asientosSeleccionados.has(String(el.id_elemento));
+        const clases = ['celda-elemento', 'celda-asiento'];
+        if (el.ocupado) clases.push('ocupado');
+        if (seleccionado && !el.ocupado) clases.push('seleccionado');
+
+        const titulo = el.ocupado
+          ? `Asiento ${el.dato_elemento} — Ocupado${el.pasajero_nombre ? ' por ' + el.pasajero_nombre : ''}`
+          : `Asiento ${el.dato_elemento} — Disponible`;
+
+        html += `<div class="${clases.join(' ')}" style="${estilo}" title="${escaparHtmlAsientos(titulo)}"
+                      onclick="toggleAsiento(${el.id_elemento}, ${el.ocupado ? 'true' : 'false'})">
+                    <span class="material-symbols-rounded text-sm">event_seat</span>
+                    <span>${escaparHtmlAsientos(el.dato_elemento)}</span>
+                  </div>`;
+      } else {
+        const esPasillo = (el.tipo_elemento || '').toLowerCase().indexOf('pasillo') !== -1;
+
+        if (esPasillo) {
+          // El pasillo es espacio de circulación, no un objeto: se deja en
+          // blanco (sin borde ni icono) para que se lea como un corredor
+          // real dentro del plano, en vez de otra celda "especial" más.
+          html += `<div class="celda-elemento celda-pasillo" style="${estilo}" title="Pasillo"></div>`;
+        } else {
+          const icono = iconoElementoEspecial(el.tipo_elemento);
+          html += `<div class="celda-elemento celda-especial" style="${estilo}" title="${escaparHtmlAsientos(el.tipo_elemento)}">
+                      <div class="d-flex flex-column align-items-center">
+                        <span class="material-symbols-rounded text-sm">${icono}</span>
+                        <span>${escaparHtmlAsientos(el.dato_elemento)}</span>
+                      </div>
+                    </div>`;
+        }
+      }
+    }
+  }
+
+  html += `</div>`;
+  html += `<div class="text-center mt-2 pt-2 border-top">
+             <span class="text-xxs text-uppercase text-secondary font-weight-bolder">=== Parte Posterior ===</span>
+           </div>`;
+
+  contenedor.innerHTML = html;
+}
+
+function toggleAsiento(idElemento, ocupado) {
+  if (ocupado) return;
+
+  const key = String(idElemento);
+  if (asientosSeleccionados.has(key)) {
+    asientosSeleccionados.delete(key);
+  } else {
+    asientosSeleccionados.add(key);
+  }
+
+  renderizarPlanoPiso();
   recalcularTotalAsientos();
 }
 
 function recalcularTotalAsientos() {
-  const n = document.querySelectorAll('.asiento-check:checked').length;
+  const n = asientosSeleccionados.size;
   const precio = turnoSeleccionado ? turnoSeleccionado.precio : 0;
   document.getElementById('lblCantAsientos').textContent = n + ' asiento(s)';
   document.getElementById('lblTotalPagarAsientos').textContent = 'Bs. ' + (n * precio).toFixed(2);
 }
 
 function obtenerAsientosSeleccionados() {
-  return Array.from(document.querySelectorAll('.asiento-check:checked')).map(chk => chk.value);
+  return Array.from(asientosSeleccionados);
 }
 
 function calcularTotalVenta() {
@@ -679,6 +906,13 @@ document.addEventListener('DOMContentLoaded', function() {
           } else {
             Swal.fire('Error al guardar', res.message || 'Error al guardar la venta de pasaje', 'error');
             btnSave.disabled = false;
+
+            // Si el error fue porque un asiento ya se vendió mientras se
+            // llenaba el formulario, se refresca el plano para que el
+            // cajero vea la ocupación real y no reintente el mismo asiento.
+            if (turnoSeleccionado && /vendido/i.test(res.message || '')) {
+              cargarAsientosTurno();
+            }
           }
         })
         .catch(err => {

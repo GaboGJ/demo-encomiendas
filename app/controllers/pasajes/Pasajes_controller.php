@@ -66,9 +66,14 @@ class Pasajes_controller {
 
     /**
      * AJAX: dado un turno, responde con sus datos (vehículo, chofer, precio,
-     * capacidad) y el mapa de asientos de su modelo, marcando cuáles ya están
-     * vendidos EN ESE turno. Se llama al elegir un turno en el paso 1 y al
-     * entrar al paso 2 del wizard (para refrescar la ocupación real).
+     * capacidad) y el PLANO COMPLETO del vehículo (todos los pisos, con sus
+     * dimensiones, y TODOS los elementos: asientos + especiales como Chofer,
+     * Baño, Escalera, TV, etc.), marcando qué asientos ya están vendidos EN
+     * ESE turno. Con esto el front-end dibuja el plano visual del bus en vez
+     * de listar los asientos en una tabla.
+     *
+     * Se llama al elegir un turno en el paso 1 y al entrar al paso 2 del
+     * wizard (para refrescar la ocupación real).
      */
     public function obtenerConfiguracionTurno() {
         if (ob_get_length()) ob_clean();
@@ -86,12 +91,79 @@ class Pasajes_controller {
             exit;
         }
 
-        $asientos = $this->elementosModel->getMapaAsientosPorModelo($turno['id_modelo'], $id_turno);
+        $pisos     = $this->elementosModel->getPisosPorModelo($turno['id_modelo']);
+        $elementos = $this->elementosModel->getElementosPorModelo($turno['id_modelo'], $id_turno);
+
+        // Rango real (mínimo/máximo) de fila y columna que ocupa cada piso.
+        // IMPORTANTE: no se asume que fila_elemento/columna_elemento empiecen
+        // en 0 -algunos datos se cargaron empezando en 1, como en este caso-,
+        // así que se normalizan restando el mínimo encontrado. Sin esto,
+        // aparecía una fila y una columna en blanco de más (desplazando todo
+        // el plano) cuando los datos venían en base 1.
+        $rangoPorPiso = [];
+        foreach ($elementos as $el) {
+            $idPiso = $el['id_piso'];
+            $fila   = intval($el['fila_elemento']);
+            $col    = intval($el['columna_elemento']);
+
+            if (!isset($rangoPorPiso[$idPiso])) {
+                $rangoPorPiso[$idPiso] = [
+                    'minFila' => $fila, 'maxFila' => $fila,
+                    'minCol'  => $col,  'maxCol'  => $col,
+                    'numero_piso' => $el['numero_piso']
+                ];
+            } else {
+                $rangoPorPiso[$idPiso]['minFila'] = min($rangoPorPiso[$idPiso]['minFila'], $fila);
+                $rangoPorPiso[$idPiso]['maxFila'] = max($rangoPorPiso[$idPiso]['maxFila'], $fila);
+                $rangoPorPiso[$idPiso]['minCol']  = min($rangoPorPiso[$idPiso]['minCol'], $col);
+                $rangoPorPiso[$idPiso]['maxCol']  = max($rangoPorPiso[$idPiso]['maxCol'], $col);
+            }
+        }
+
+        foreach ($elementos as &$el) {
+            $idPiso = $el['id_piso'];
+            if (isset($rangoPorPiso[$idPiso])) {
+                $el['fila_elemento']    = intval($el['fila_elemento'])    - $rangoPorPiso[$idPiso]['minFila'];
+                $el['columna_elemento'] = intval($el['columna_elemento']) - $rangoPorPiso[$idPiso]['minCol'];
+            }
+        }
+        unset($el);
+
+        if (empty($pisos)) {
+            // No hay fila en `pisos` (o quedó inactiva): se arma un piso
+            // "virtual" por cada id_piso que sí tenga elementos, para no
+            // dejar el plano en blanco.
+            $pisos = [];
+            foreach ($rangoPorPiso as $idPiso => $r) {
+                $pisos[] = [
+                    'id_piso'       => $idPiso,
+                    'numero_piso'   => $r['numero_piso'],
+                    'nombre_piso'   => null,
+                    'filas_piso'    => ($r['maxFila'] - $r['minFila'] + 1),
+                    'columnas_piso' => ($r['maxCol'] - $r['minCol'] + 1)
+                ];
+            }
+        } else {
+            foreach ($pisos as &$piso) {
+                $idPiso = $piso['id_piso'];
+                $necesitaFilas = isset($rangoPorPiso[$idPiso]) ? ($rangoPorPiso[$idPiso]['maxFila'] - $rangoPorPiso[$idPiso]['minFila'] + 1) : 0;
+                $necesitaCols  = isset($rangoPorPiso[$idPiso]) ? ($rangoPorPiso[$idPiso]['maxCol']  - $rangoPorPiso[$idPiso]['minCol']  + 1) : 0;
+
+                // Siempre el mayor entre lo declarado en `pisos` y lo que
+                // realmente ocupan los elementos: así nunca se recorta el
+                // plano, aunque el registro de `pisos` haya quedado
+                // desactualizado frente a la cantidad real de asientos.
+                $piso['filas_piso']    = max(intval($piso['filas_piso']), $necesitaFilas, 1);
+                $piso['columnas_piso'] = max(intval($piso['columnas_piso']), $necesitaCols, 1);
+            }
+            unset($piso);
+        }
 
         echo json_encode([
-            'success'  => true,
-            'turno'    => $turno,
-            'asientos' => $asientos
+            'success'   => true,
+            'turno'     => $turno,
+            'pisos'     => $pisos,
+            'elementos' => $elementos
         ]);
         exit;
     }
@@ -102,6 +174,13 @@ class Pasajes_controller {
      *     se toma del turno (precio_pasaje_turno); el pasaje queda "Asignado".
      *   - SIN turno (en espera): se piden cantidad_pasajes y precio_manual;
      *     el pasaje queda "Pendiente" de que se le asigne chofer/vehículo.
+     *
+     * IMPORTANTE (columnas nullable): la venta "en espera" guarda
+     * detalles_pasajes con id_turno / id_elemento en NULL. Si tu base de
+     * datos todavía no tiene esas columnas como NULL (el modelo original las
+     * trae NOT NULL), aplica la migración
+     * database/migrations/002_detalles_pasajes_turno_opcional.sql antes de
+     * usar esta opción, o esa rama fallará con un error de integridad.
      */
     public function guardar() {
         if (ob_get_length()) ob_clean();
@@ -147,6 +226,8 @@ class Pasajes_controller {
 
             global $pdo;
             $pdo->beginTransaction();
+            $resPasaje = null;
+            $idPasaje  = null;
 
             try {
                 if ($id_turno) {
@@ -216,15 +297,33 @@ class Pasajes_controller {
 
                 $pdo->commit();
             } catch (PDOException $e) {
-                $pdo->rollBack();
-                // Choque contra la UNIQUE (id_turno, id_elemento): alguien más
-                // vendió ese asiento entre que se cargó la tabla y se guardó.
-                if ((int) $e->getCode() === 23000 || strpos($e->getMessage(), '1062') !== false) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+
+                // MUY IMPORTANTE: antes se asumía que CUALQUIER error de
+                // integridad (SQLSTATE clase 23000) era "el asiento ya fue
+                // vendido", pero esa clase también cubre violaciones de
+                // NOT NULL y de llave foránea (por ejemplo id_estado_pasaje
+                // o id_turno/id_elemento apuntando a un registro que no
+                // existe, o columnas que en tu base todavía son NOT NULL).
+                // Eso ocultaba el error real y confundía, porque el mensaje
+                // decía "ya fue vendido" sin serlo. Ahora se distingue el
+                // código NATIVO de MySQL (1062 = duplicado real) del resto.
+                $codigoMysql = $e->errorInfo[1] ?? null;
+
+                if ($codigoMysql == 1062) {
                     throw new Exception('Uno de los asientos seleccionados ya fue vendido. Actualice la lista e intente nuevamente.');
                 }
-                throw $e;
+
+                // Para cualquier otro error de base de datos, se muestra el
+                // motivo real (mensaje de MySQL) para poder diagnosticarlo,
+                // en vez de una excusa genérica que no corresponde.
+                throw new Exception('No se pudo registrar la venta (' . $e->getMessage() . ')');
             } catch (Exception $e) {
-                $pdo->rollBack();
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 throw $e;
             }
 
