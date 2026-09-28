@@ -59,33 +59,11 @@
                       <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Chofer / Vehículo en Turno</h6>
                     </div>
 
-                    <div class="input-group input-group-outline my-2 is-filled">
-                      <label class="form-label">Turno Disponible *</label>
-                      <select class="form-control" id="selectTurno" onchange="onCambioTurno()">
-                        <option value="" selected disabled>-- Seleccione el turno --</option>
-                        <?php if (!empty($turnos_disponibles)): ?>
-                          <?php foreach ($turnos_disponibles as $t): ?>
-                            <?php
-                              $capacidad = intval($t['total_asientos_modelo'] ?? 0);
-                              $ocupados  = intval($t['asientos_ocupados'] ?? 0);
-                              $textoOpt  = $t['ciudad_destino'] . ' — Móvil ' . $t['numero_interno_vehiculo']
-                                         . ' (' . $t['nombre_modelo'] . ') — ' . $t['nombre_chofer']
-                                         . ' — Bs. ' . number_format($t['precio_pasaje_turno'], 2)
-                                         . ' — ' . $ocupados . '/' . $capacidad . ' ocupados';
-                            ?>
-                            <option value="<?= $t['id_turno'] ?>"
-                                    data-precio="<?= $t['precio_pasaje_turno'] ?>"
-                                    data-destino="<?= htmlspecialchars($t['ciudad_destino']) ?>"
-                                    data-vehiculo="Móvil <?= htmlspecialchars($t['numero_interno_vehiculo']) ?> (<?= htmlspecialchars($t['nombre_modelo']) ?>)"
-                                    data-chofer="<?= htmlspecialchars($t['nombre_chofer']) ?>"
-                                    data-capacidad="<?= $capacidad ?>"
-                                    data-ocupados="<?= $ocupados ?>"
-                                    <?= $ocupados >= $capacidad && $capacidad > 0 ? 'disabled' : '' ?>>
-                              <?= htmlspecialchars($textoOpt) ?><?= ($ocupados >= $capacidad && $capacidad > 0) ? ' (Cupo Lleno)' : '' ?>
-                            </option>
-                          <?php endforeach; ?>
-                        <?php endif; ?>
-                      </select>
+                    <div class="mb-2 position-relative">
+                      <label class="form-label text-xs font-weight-bold text-dark text-uppercase">Turno Disponible *</label>
+                      <input type="text" id="buscadorTurno" class="form-control border px-3 py-2 border-radius-md text-sm" placeholder="Escriba destino, chofer, placa o Nº de unidad..." autocomplete="off"<?= empty($turnos_disponibles) ? ' disabled' : '' ?>>
+                      <input type="hidden" id="selectTurno" value="">
+                      <div id="listaTurnos" class="list-group position-absolute w-100 shadow-sm border-radius-md mt-1" style="z-index: 1055; max-height: 280px; overflow-y: auto; display: none;"></div>
                     </div>
 
                     <?php if (empty($turnos_disponibles)): ?>
@@ -118,110 +96,138 @@
                     </div>
                   </div>
                 </div>
+<!-- Columna Derecha: Datos del Comprador -->
+<div class="col-12 col-lg-6">
+  <div class="p-3 border border-radius-md bg-white h-100">
+    <div class="d-flex align-items-center mb-3">
+      <span class="material-symbols-rounded text-success me-2">person</span>
+      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador (quien paga)</h6>
+    </div>
 
-                <!-- Columna Derecha: Datos del Comprador -->
-                <div class="col-12 col-lg-6">
-                  <div class="p-3 border border-radius-md bg-white h-100">
-                    <div class="d-flex align-items-center mb-3">
-                      <span class="material-symbols-rounded text-success me-2">person</span>
-                      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador (quien paga)</h6>
-                    </div>
+    <div class="row g-2">
+      <!-- Fila 1: Carnet y Celular -->
+      <div class="col-12 col-md-6">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Nº Carnet / C.I. *</label>
+          <input type="text" class="form-control form-control" id="comprador_ci" onblur="buscarComprador()" required>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Celular de Contacto *</label>
+          <input type="text" class="form-control form-control" id="comprador_celular" required>
+        </div>
+      </div>
 
-                    <div class="row g-2">
-                      <div class="col-12">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Nº Carnet / C.I. *</label>
-                          <input type="text" class="form-control" id="comprador_ci" onblur="buscarComprador()" required>
-                        </div>
-                      </div>
-                      <div class="col-12">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Nombres *</label>
-                          <input type="text" class="form-control" id="comprador_nombres" required>
-                        </div>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Apellido Paterno *</label>
-                          <input type="text" class="form-control" id="comprador_paterno" required>
-                        </div>
-                      </div>
-                      <div class="col-12 col-md-6">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Apellido Materno</label>
-                          <input type="text" class="form-control" id="comprador_materno">
-                        </div>
-                      </div>
-                      <div class="col-12">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Celular de Contacto *</label>
-                          <input type="text" class="form-control" id="comprador_celular" required>
-                        </div>
-                      </div>
-                      <div class="col-12">
-                        <div class="input-group input-group-outline my-2">
-                          <label class="form-label">Dirección / Ref.</label>
-                          <input type="text" class="form-control" id="comprador_direccion">
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      <!-- Fila 2: Nombres, Ap. Paterno y Ap. Materno -->
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Nombres *</label>
+          <input type="text" class="form-control form-control" id="comprador_nombres" required>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Apellido Paterno *</label>
+          <input type="text" class="form-control form-control" id="comprador_paterno" required>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Apellido Materno</label>
+          <input type="text" class="form-control form-control" id="comprador_materno">
+        </div>
+      </div>
+
+      <!-- Fila 3: Dirección -->
+      <div class="col-12">
+        <div class="input-group input-group-outline my-1">
+          <label class="form-label">Dirección / Ref.</label>
+          <input type="text" class="form-control form-control" id="comprador_direccion">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+                
               </div>
             </div>
 
-            <!-- PASO 2: PLANO DE ASIENTOS Y PASAJERO POR ASIENTO -->
-            <div class="wizard-step d-none" id="step-2">
+<!-- PASO 2: PLANO DE ASIENTOS Y PASAJERO POR ASIENTO (LADO A LADO) -->
+<div class="wizard-step d-none" id="step-2">
+  <div id="panelAsientos">
+    <div class="row g-3">
 
-              <div id="panelAsientos">
-                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
-                  <div class="d-flex align-items-center">
-                    <span class="material-symbols-rounded text-success me-2">event_seat</span>
-                    <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Plano del Vehículo y Selección de Asientos</h6>
-                  </div>
-                  <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-disponible"></span> Disponible</span>
-                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-seleccionado"></span> Seleccionado</span>
-                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-ocupado"></span> Ocupado</span>
-                  </div>
-                </div>
-                <p class="text-xxs text-secondary mb-3">Haga clic sobre un asiento disponible para seleccionarlo. Los asientos en gris ya fueron vendidos en este turno.</p>
-
-                <div class="p-3 border border-radius-md bg-white">
-                  <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
-                    <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
-                  </div>
-                </div>
-
-                <!-- Paginador de Piso (solo si el vehículo tiene más de un piso) -->
-                <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
-                  <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
-                    <i class="material-symbols-rounded text-sm">chevron_left</i>
-                  </button>
-                  <span class="text-xs font-weight-bold text-dark" id="lblPisoActual">Piso 1 de 1</span>
-                  <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoSiguiente" onclick="cambiarPisoPaginador(1)">
-                    <i class="material-symbols-rounded text-sm">chevron_right</i>
-                  </button>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center p-3 bg-gray-100 border-radius-lg mt-3">
-                  <span class="text-xs font-weight-bold text-dark" id="lblCantAsientos">0 asiento(s)</span>
-                  <h5 class="text-success mb-0 font-weight-bolder" id="lblTotalPagarAsientos">Bs. 0.00</h5>
-                </div>
-
-                <!-- PASAJERO POR ASIENTO -->
-                <div class="mt-3 p-3 border border-radius-md bg-white">
-                  <div class="d-flex align-items-center mb-1">
-                    <span class="material-symbols-rounded text-success me-2">groups</span>
-                    <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Pasajero por Asiento</h6>
-                  </div>
-                  <p class="text-xxs text-secondary mb-2">Por defecto cada asiento queda a nombre del comprador. Use el lápiz para asignarlo a otra persona.</p>
-                  <div id="listaPasajerosAsientos">
-                    <div class="text-xs text-secondary">Aún no seleccionó asientos.</div>
-                  </div>
-                </div>
+      <!-- COLUMNA IZQUIERDA: PLANO DEL VEHÍCULO Y SELECCIÓN DE ASIENTOS -->
+      <div class="col-12 col-lg-6">
+        <div class="p-3 border border-radius-md bg-white h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
+              <div class="d-flex align-items-center">
+                <span class="material-symbols-rounded text-success me-2">event_seat</span>
+                <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Plano del Vehículo y Selección</h6>
+              </div>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-disponible"></span> Disp.</span>
+                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-seleccionado"></span> Selec.</span>
+                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-ocupado"></span> Ocup.</span>
               </div>
             </div>
+            <p class="text-xxs text-secondary mb-2">Haga clic sobre un asiento disponible para seleccionarlo.</p>
+
+            <!-- PLANO CONTENEDOR -->
+            <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
+              <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
+            </div>
+
+            <!-- PAGINADOR DE PISO -->
+            <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
+              <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
+                <i class="material-symbols-rounded text-sm">chevron_left</i>
+              </button>
+              <span class="text-xs font-weight-bold text-dark" id="lblPisoActual">Piso 1 de 1</span>
+              <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoSiguiente" onclick="cambiarPisoPaginador(1)">
+                <i class="material-symbols-rounded text-sm">chevron_right</i>
+              </button>
+            </div>
+          </div>
+
+          <!-- RESUMEN DE ASIENTOS Y TOTAL -->
+          <div class="d-flex justify-content-between align-items-center p-3 bg-gray-100 border-radius-lg mt-3">
+            <span class="text-xs font-weight-bold text-dark" id="lblCantAsientos">0 asiento(s)</span>
+            <h5 class="text-success mb-0 font-weight-bolder" id="lblTotalPagarAsientos">Bs. 0.00</h5>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUMNA DERECHA: TABLA DE PASAJERO POR ASIENTO -->
+      <div class="col-12 col-lg-6">
+        <div class="p-3 border border-radius-md bg-white h-100">
+          <div class="d-flex align-items-center mb-1">
+            <span class="material-symbols-rounded text-success me-2">groups</span>
+            <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Pasajero por Asiento</h6>
+          </div>
+          <p class="text-xxs text-secondary mb-3">Por defecto cada asiento queda a nombre del comprador. Use el lápiz para asignarlo a otra persona.</p>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0 w-100" id="tablaPasajerosAsientos">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Asiento</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Pasajero</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tipo</th>
+                  <th class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Acciones</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
             <!-- PASO 3: PAGO Y EMISIÓN -->
             <div class="wizard-step d-none" id="step-3">
@@ -351,14 +357,10 @@
         <p class="text-xxs text-secondary mb-2">Indique quién viajará en este asiento. Si el C.I. ya está registrado se completan los datos automáticamente.</p>
         <input type="hidden" id="pas_id_elemento">
         <div class="row g-2">
-          <div class="col-12 col-md-4">
+          <div class="col-12">
             <div class="input-group input-group-outline my-2">
               <label class="form-label">Nº Carnet / C.I. *</label>
               <input type="text" class="form-control" id="pas_ci" onblur="buscarPasajeroModal()">
-            </div>
-             <div class="input-group input-group-outline my-2">
-              <label class="form-label">Celular</label>
-              <input type="text" class="form-control" id="pas_celular">
             </div>
           </div>
           <div class="col-12">
@@ -525,6 +527,7 @@ const baseUrl = '<?php echo rtrim(URL, "/"); ?>';
 let pisosPlano = [];
 let elementosPlano = [];
 let pisoActivoPlano = null;
+let dtPasajeros = null;
 
 // Asientos elegidos: key (id_elemento como string) -> datos del pasajero de ESE asiento.
 //   usar_comprador = true  -> el asiento va a nombre del comprador (se resuelve al enviar,
@@ -610,10 +613,75 @@ function buscarPasajeroModal() {
   });
 }
 
-// --- Selección de turno ---
-function onCambioTurno() {
-  const sel = document.getElementById('selectTurno');
-  const infoTurno = document.getElementById('infoTurnoSeleccionado');
+// --- Selección de turno (buscador tipo autocompletar, igual que en despachos/new.php) ---
+
+// Datos de TODOS los turnos disponibles, precargados desde PHP. Antes esta
+// información solo vivía dentro de los atributos data-* del <select>: si el
+// navegador no disparaba bien el evento "change" (o el <select> se quedaba
+// sin resolver por el estilo de Material Dashboard), turnoSeleccionado nunca
+// se llenaba y por eso el plano de asientos del Paso 2 no tenía de dónde
+// cargar datos. Ahora el buscador arma turnoSeleccionado directamente desde
+// este arreglo, sin depender de leer atributos de un elemento del DOM.
+const turnosDisponiblesData = <?= json_encode(array_map(function ($t) {
+    $capacidad = intval($t['total_asientos_modelo'] ?? 0);
+    $ocupados  = intval($t['asientos_ocupados'] ?? 0);
+    $lleno     = ($ocupados >= $capacidad && $capacidad > 0);
+    $label     = $t['ciudad_destino'] . ' — Móvil ' . $t['numero_interno_vehiculo']
+               . ' (' . $t['nombre_modelo'] . ') — ' . $t['nombre_chofer']
+               . ' — Bs. ' . number_format($t['precio_pasaje_turno'], 2)
+               . ' — ' . $ocupados . '/' . $capacidad . ' ocupados'
+               . ($lleno ? ' (Cupo Lleno)' : '');
+    return [
+        'id'        => $t['id_turno'],
+        'label'     => $label,
+        'precio'    => $t['precio_pasaje_turno'],
+        'destino'   => $t['ciudad_destino'],
+        'vehiculo'  => 'Móvil ' . $t['numero_interno_vehiculo'] . ' (' . $t['nombre_modelo'] . ')',
+        'chofer'    => $t['nombre_chofer'],
+        'capacidad' => $capacidad,
+        'ocupados'  => $ocupados,
+        'lleno'     => $lleno,
+        'buscar'    => mb_strtolower(
+            $t['ciudad_destino'] . ' ' . $t['numero_interno_vehiculo'] . ' ' . $t['nombre_modelo'] . ' ' . $t['nombre_chofer'],
+            'UTF-8'
+        )
+    ];
+}, $turnos_disponibles ?? []), JSON_UNESCAPED_UNICODE) ?>;
+
+let resultadosTurnoActuales = [];
+let indiceActivoTurno = -1;
+
+function renderListaTurnos(items) {
+  const listaContainer = document.getElementById('listaTurnos');
+  resultadosTurnoActuales = items;
+  indiceActivoTurno = -1;
+
+  if (!items.length) {
+    listaContainer.innerHTML = '<div class="list-group-item text-xs text-secondary">Sin resultados...</div>';
+    listaContainer.style.display = 'block';
+    return;
+  }
+
+  listaContainer.innerHTML = items.map(function (item, i) {
+    const claseLleno = item.lleno ? ' text-secondary bg-gray-100' : '';
+    return `<button type="button" class="list-group-item list-group-item-action text-xs py-2${claseLleno}" data-index="${i}"${item.lleno ? ' disabled' : ''}>${escaparHtmlAsientos(item.label)}</button>`;
+  }).join('');
+  listaContainer.style.display = 'block';
+}
+
+function marcarActivoTurno() {
+  const listaContainer = document.getElementById('listaTurnos');
+  const botones = listaContainer.querySelectorAll('[data-index]');
+  botones.forEach(function (b, i) { b.classList.toggle('active', i === indiceActivoTurno); });
+}
+
+function seleccionarTurnoBuscado(item) {
+  if (!item || item.lleno) return;
+
+  document.getElementById('selectTurno').value = item.id;
+  document.getElementById('buscadorTurno').value = item.label;
+  document.getElementById('buscadorTurno').classList.remove('is-invalid');
+  document.getElementById('listaTurnos').style.display = 'none';
 
   // Cambiar de turno invalida cualquier selección de asientos previa.
   asientosSeleccionados.clear();
@@ -622,30 +690,85 @@ function onCambioTurno() {
   pisoActivoPlano = null;
   renderizarListaPasajeros();
 
-  if (!sel.value) {
-    turnoSeleccionado = null;
-    infoTurno.classList.add('d-none');
-    return;
-  }
-
-  const opt = sel.options[sel.selectedIndex];
   turnoSeleccionado = {
-    id: sel.value,
-    precio: parseFloat(opt.getAttribute('data-precio')) || 0,
-    destino: opt.getAttribute('data-destino'),
-    vehiculo: opt.getAttribute('data-vehiculo'),
-    chofer: opt.getAttribute('data-chofer'),
-    capacidad: parseInt(opt.getAttribute('data-capacidad')) || 0,
-    ocupados: parseInt(opt.getAttribute('data-ocupados')) || 0
+    id: item.id,
+    precio: parseFloat(item.precio) || 0,
+    destino: item.destino,
+    vehiculo: item.vehiculo,
+    chofer: item.chofer,
+    capacidad: item.capacidad,
+    ocupados: item.ocupados
   };
 
   document.getElementById('lblInfoDestino').textContent = turnoSeleccionado.destino;
   document.getElementById('lblInfoVehiculo').textContent = turnoSeleccionado.vehiculo;
   document.getElementById('lblInfoChofer').textContent = turnoSeleccionado.chofer;
   document.getElementById('lblInfoPrecio').textContent = 'Bs. ' + turnoSeleccionado.precio.toFixed(2);
-
-  infoTurno.classList.remove('d-none');
+  document.getElementById('infoTurnoSeleccionado').classList.remove('d-none');
 }
+
+(function inicializarBuscadorTurno() {
+  const inputBuscador = document.getElementById('buscadorTurno');
+  const listaContainer = document.getElementById('listaTurnos');
+  if (!inputBuscador || !listaContainer) return;
+
+  inputBuscador.addEventListener('input', function () {
+    document.getElementById('selectTurno').value = '';
+    turnoSeleccionado = null;
+    document.getElementById('infoTurnoSeleccionado').classList.add('d-none');
+
+    const q = this.value.trim().toLowerCase();
+    if (!q) {
+      listaContainer.style.display = 'none';
+      return;
+    }
+
+    const filtrados = turnosDisponiblesData.filter(function (t) {
+      return t.buscar.includes(q);
+    }).slice(0, 8);
+
+    renderListaTurnos(filtrados);
+  });
+
+  inputBuscador.addEventListener('focus', function () {
+    if (this.value.trim() && listaContainer.innerHTML) {
+      listaContainer.style.display = 'block';
+    }
+  });
+
+  inputBuscador.addEventListener('keydown', function (e) {
+    if (listaContainer.style.display === 'none' || !resultadosTurnoActuales.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      indiceActivoTurno = Math.min(indiceActivoTurno + 1, resultadosTurnoActuales.length - 1);
+      marcarActivoTurno();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      indiceActivoTurno = Math.max(indiceActivoTurno - 1, 0);
+      marcarActivoTurno();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const elegido = indiceActivoTurno >= 0 ? resultadosTurnoActuales[indiceActivoTurno] : resultadosTurnoActuales[0];
+      if (elegido) seleccionarTurnoBuscado(elegido);
+    } else if (e.key === 'Escape') {
+      listaContainer.style.display = 'none';
+    }
+  });
+
+  listaContainer.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-index]');
+    if (!btn || btn.disabled) return;
+    const item = resultadosTurnoActuales[parseInt(btn.getAttribute('data-index'), 10)];
+    if (item) seleccionarTurnoBuscado(item);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#buscadorTurno') && !e.target.closest('#listaTurnos')) {
+      listaContainer.style.display = 'none';
+    }
+  });
+})();
 
 // --- Carga del plano visual del vehículo (paso 2) ---
 function cargarAsientosTurno() {
@@ -866,44 +989,54 @@ function recalcularTotalAsientos() {
   document.getElementById('lblTotalPagarAsientos').textContent = 'Bs. ' + (n * precio).toFixed(2);
 }
 
-// --- Pasajero por asiento ---
-function renderizarListaPasajeros() {
-  const cont = document.getElementById('listaPasajerosAsientos');
-  if (!cont) return;
+// --- Pasajero por asiento (tabla con DataTables, igual patrón que tablaBultos en encomiendas/new.php) ---
+function inicializarDataTablePasajeros() {
+  if (dtPasajeros) return;
 
-  if (!asientosSeleccionados.size) {
-    cont.innerHTML = '<div class="text-xs text-secondary">Aún no seleccionó asientos.</div>';
-    return;
+  if (typeof inicializarDataTable === 'function') {
+    dtPasajeros = inicializarDataTable('#tablaPasajerosAsientos', {
+      ordering: false,
+      placeholder: 'Buscar asiento...',
+      pageLength: 5,
+      columns: [
+        { data: 'asiento', className: 'text-xs font-weight-bold' },
+        { data: 'pasajero', className: 'text-xs font-weight-bold' },
+        { data: 'tipo', className: 'text-xs' },
+        { data: 'acciones', className: 'text-end', orderable: false }
+      ]
+    });
   }
+}
+
+function renderizarListaPasajeros() {
+  inicializarDataTablePasajeros();
+  if (!dtPasajeros) return;
+
+  dtPasajeros.clear();
 
   const comp = datosComprador();
-  let html = '';
+  const dataRows = [];
 
   asientosSeleccionados.forEach((a, key) => {
     const p = a.usar_comprador ? comp : a;
     const nombre = nombreCompleto(p) || (a.usar_comprador ? '(complete los datos del comprador en el paso 1)' : '-');
-    const etiquetaPersona = a.usar_comprador
-      ? '<span class="badge badge-sm bg-gradient-secondary ms-1">Comprador</span>'
-      : `<span class="badge badge-sm bg-gradient-info ms-1">Otra persona</span>`;
-    const ciTxt = p.ci ? `<span class="text-xxs text-secondary ms-1">C.I. ${escaparHtmlAsientos(p.ci)}</span>` : '';
+    const ciTxt = p.ci ? ` <span class="text-xxs text-secondary">C.I. ${escaparHtmlAsientos(p.ci)}</span>` : '';
+    const tipoBadge = a.usar_comprador
+      ? '<span class="badge badge-sm bg-gradient-secondary">Comprador</span>'
+      : '<span class="badge badge-sm bg-gradient-info">Otra persona</span>';
 
-    html += `
-      <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <span class="badge bg-gradient-success">Asiento ${escaparHtmlAsientos(a.etiqueta)}</span>
-          <span class="text-xs font-weight-bold text-dark">${escaparHtmlAsientos(nombre)}</span>
-          ${etiquetaPersona}${ciTxt}
-        </div>
-        <div class="d-flex align-items-center gap-1">
-          ${a.usar_comprador ? '' : `<button type="button" class="btn btn-link text-secondary p-1 m-0" title="Volver al comprador" onclick="restablecerPasajeroAsiento('${key}')"><i class="material-symbols-rounded text-sm">undo</i></button>`}
-          <button type="button" class="btn btn-link text-success p-1 m-0" title="Cambiar pasajero" onclick="editarPasajeroAsiento('${key}')">
-            <i class="material-symbols-rounded text-sm">edit</i>
-          </button>
-        </div>
-      </div>`;
+    dataRows.push({
+      asiento: `<span class="badge bg-gradient-success">Asiento ${escaparHtmlAsientos(a.etiqueta)}</span>`,
+      pasajero: `${escaparHtmlAsientos(nombre)}${ciTxt}`,
+      tipo: tipoBadge,
+      acciones: `<div class="d-flex align-items-center justify-content-end gap-1">
+                   ${a.usar_comprador ? '' : `<button type="button" class="btn btn-link text-secondary p-1 m-0" title="Volver al comprador" onclick="restablecerPasajeroAsiento('${key}')"><i class="material-symbols-rounded text-sm">undo</i></button>`}
+                   <button type="button" class="btn btn-link text-success p-1 m-0" title="Cambiar pasajero" onclick="editarPasajeroAsiento('${key}')"><i class="material-symbols-rounded text-sm">edit</i></button>
+                 </div>`
+    });
   });
 
-  cont.innerHTML = html;
+  dtPasajeros.rows.add(dataRows).draw();
 }
 
 function editarPasajeroAsiento(key) {
