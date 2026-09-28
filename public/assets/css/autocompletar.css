@@ -1,0 +1,30 @@
+/* =========================================================
+   autocompletar.css
+   Lista desplegable del buscador (despachos/new, pasajes/new, ...)
+   Usar junto con: <div class="autocompletar-lista list-group position-absolute w-100 ...">
+   ========================================================= */
+
+.autocompletar-lista {
+  z-index: 1055;
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;
+}
+
+.autocompletar-lista .list-group-item {
+  white-space: normal;      /* etiquetas largas se parten en varias líneas */
+  text-align: left;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.autocompletar-lista .list-group-item:disabled,
+.autocompletar-lista .list-group-item.disabled {
+  color: #8392ab;
+  background: #f8f9fa;
+  cursor: not-allowed;
+}
+
+@media (max-width: 575.98px) {
+  .autocompletar-lista { max-height: 45vh; }
+}

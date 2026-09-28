@@ -96,138 +96,138 @@
                     </div>
                   </div>
                 </div>
-<!-- Columna Derecha: Datos del Comprador -->
-<div class="col-12 col-lg-6">
-  <div class="p-3 border border-radius-md bg-white h-100">
-    <div class="d-flex align-items-center mb-3">
-      <span class="material-symbols-rounded text-success me-2">person</span>
-      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador (quien paga)</h6>
+    <!-- Columna Derecha: Datos del Comprador -->
+    <div class="col-12 col-lg-6">
+    <div class="p-3 border border-radius-md bg-white h-100">
+        <div class="d-flex align-items-center mb-3">
+        <span class="material-symbols-rounded text-success me-2">person</span>
+        <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador (quien paga)</h6>
+        </div>
+
+        <div class="row g-2">
+        <!-- Fila 1: Carnet y Celular -->
+        <div class="col-12 col-md-6">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Nº Carnet / C.I. *</label>
+            <input type="text" class="form-control form-control" id="comprador_ci" onblur="buscarComprador()" required>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Celular de Contacto *</label>
+            <input type="text" class="form-control form-control" id="comprador_celular" required>
+            </div>
+        </div>
+
+        <!-- Fila 2: Nombres, Ap. Paterno y Ap. Materno -->
+        <div class="col-12 col-md-4">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Nombres *</label>
+            <input type="text" class="form-control form-control" id="comprador_nombres" required>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Apellido Paterno *</label>
+            <input type="text" class="form-control form-control" id="comprador_paterno" required>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Apellido Materno</label>
+            <input type="text" class="form-control form-control" id="comprador_materno">
+            </div>
+        </div>
+
+        <!-- Fila 3: Dirección -->
+        <div class="col-12">
+            <div class="input-group input-group-outline my-1">
+            <label class="form-label">Dirección / Ref.</label>
+            <input type="text" class="form-control form-control" id="comprador_direccion">
+            </div>
+        </div>
+        </div>
     </div>
-
-    <div class="row g-2">
-      <!-- Fila 1: Carnet y Celular -->
-      <div class="col-12 col-md-6">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Nº Carnet / C.I. *</label>
-          <input type="text" class="form-control form-control" id="comprador_ci" onblur="buscarComprador()" required>
-        </div>
-      </div>
-      <div class="col-12 col-md-6">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Celular de Contacto *</label>
-          <input type="text" class="form-control form-control" id="comprador_celular" required>
-        </div>
-      </div>
-
-      <!-- Fila 2: Nombres, Ap. Paterno y Ap. Materno -->
-      <div class="col-12 col-md-4">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Nombres *</label>
-          <input type="text" class="form-control form-control" id="comprador_nombres" required>
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Apellido Paterno *</label>
-          <input type="text" class="form-control form-control" id="comprador_paterno" required>
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Apellido Materno</label>
-          <input type="text" class="form-control form-control" id="comprador_materno">
-        </div>
-      </div>
-
-      <!-- Fila 3: Dirección -->
-      <div class="col-12">
-        <div class="input-group input-group-outline my-1">
-          <label class="form-label">Dirección / Ref.</label>
-          <input type="text" class="form-control form-control" id="comprador_direccion">
-        </div>
-      </div>
     </div>
-  </div>
-</div>
                 
               </div>
             </div>
 
-<!-- PASO 2: PLANO DE ASIENTOS Y PASAJERO POR ASIENTO (LADO A LADO) -->
-<div class="wizard-step d-none" id="step-2">
-  <div id="panelAsientos">
-    <div class="row g-3">
+    <!-- PASO 2: PLANO DE ASIENTOS Y PASAJERO POR ASIENTO (LADO A LADO) -->
+    <div class="wizard-step d-none" id="step-2">
+    <div id="panelAsientos">
+        <div class="row g-3">
 
-      <!-- COLUMNA IZQUIERDA: PLANO DEL VEHÍCULO Y SELECCIÓN DE ASIENTOS -->
-      <div class="col-12 col-lg-6">
-        <div class="p-3 border border-radius-md bg-white h-100 d-flex flex-column justify-content-between">
-          <div>
-            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
-              <div class="d-flex align-items-center">
-                <span class="material-symbols-rounded text-success me-2">event_seat</span>
-                <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Plano del Vehículo y Selección</h6>
-              </div>
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-disponible"></span> Disp.</span>
-                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-seleccionado"></span> Selec.</span>
-                <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-ocupado"></span> Ocup.</span>
-              </div>
+        <!-- COLUMNA IZQUIERDA: PLANO DEL VEHÍCULO Y SELECCIÓN DE ASIENTOS -->
+        <div class="col-12 col-lg-6">
+            <div class="p-3 border border-radius-md bg-white h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
+                <div class="d-flex align-items-center">
+                    <span class="material-symbols-rounded text-success me-2">event_seat</span>
+                    <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Plano del Vehículo y Selección</h6>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-disponible"></span> Disp.</span>
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-seleccionado"></span> Selec.</span>
+                    <span class="d-flex align-items-center gap-1 text-xxs text-secondary font-weight-bold"><span class="leyenda-punto leyenda-ocupado"></span> Ocup.</span>
+                </div>
+                </div>
+                <p class="text-xxs text-secondary mb-2">Haga clic sobre un asiento disponible para seleccionarlo.</p>
+
+                <!-- PLANO CONTENEDOR -->
+                <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
+                <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
+                </div>
+
+                <!-- PAGINADOR DE PISO -->
+                <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
+                <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
+                    <i class="material-symbols-rounded text-sm">chevron_left</i>
+                </button>
+                <span class="text-xs font-weight-bold text-dark" id="lblPisoActual">Piso 1 de 1</span>
+                <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoSiguiente" onclick="cambiarPisoPaginador(1)">
+                    <i class="material-symbols-rounded text-sm">chevron_right</i>
+                </button>
+                </div>
             </div>
-            <p class="text-xxs text-secondary mb-2">Haga clic sobre un asiento disponible para seleccionarlo.</p>
 
-            <!-- PLANO CONTENEDOR -->
-            <div id="contenedorPlanoAsientos" class="vehicle-blueprint-horizontal mx-auto position-relative p-3 bg-white overflow-auto" style="max-width: 100%;">
-              <div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>
+            <!-- RESUMEN DE ASIENTOS Y TOTAL -->
+            <div class="d-flex justify-content-between align-items-center p-3 bg-gray-100 border-radius-lg mt-3">
+                <span class="text-xs font-weight-bold text-dark" id="lblCantAsientos">0 asiento(s)</span>
+                <h5 class="text-success mb-0 font-weight-bolder" id="lblTotalPagarAsientos">Bs. 0.00</h5>
             </div>
-
-            <!-- PAGINADOR DE PISO -->
-            <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
-              <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
-                <i class="material-symbols-rounded text-sm">chevron_left</i>
-              </button>
-              <span class="text-xs font-weight-bold text-dark" id="lblPisoActual">Piso 1 de 1</span>
-              <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoSiguiente" onclick="cambiarPisoPaginador(1)">
-                <i class="material-symbols-rounded text-sm">chevron_right</i>
-              </button>
             </div>
-          </div>
-
-          <!-- RESUMEN DE ASIENTOS Y TOTAL -->
-          <div class="d-flex justify-content-between align-items-center p-3 bg-gray-100 border-radius-lg mt-3">
-            <span class="text-xs font-weight-bold text-dark" id="lblCantAsientos">0 asiento(s)</span>
-            <h5 class="text-success mb-0 font-weight-bolder" id="lblTotalPagarAsientos">Bs. 0.00</h5>
-          </div>
         </div>
-      </div>
 
-      <!-- COLUMNA DERECHA: TABLA DE PASAJERO POR ASIENTO -->
-      <div class="col-12 col-lg-6">
-        <div class="p-3 border border-radius-md bg-white h-100">
-          <div class="d-flex align-items-center mb-1">
-            <span class="material-symbols-rounded text-success me-2">groups</span>
-            <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Pasajero por Asiento</h6>
-          </div>
-          <p class="text-xxs text-secondary mb-3">Por defecto cada asiento queda a nombre del comprador. Use el lápiz para asignarlo a otra persona.</p>
+        <!-- COLUMNA DERECHA: TABLA DE PASAJERO POR ASIENTO -->
+        <div class="col-12 col-lg-6">
+            <div class="p-3 border border-radius-md bg-white h-100">
+            <div class="d-flex align-items-center mb-1">
+                <span class="material-symbols-rounded text-success me-2">groups</span>
+                <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Pasajero por Asiento</h6>
+            </div>
+            <p class="text-xxs text-secondary mb-3">Por defecto cada asiento queda a nombre del comprador. Use el lápiz para asignarlo a otra persona.</p>
 
-          <div class="table-responsive p-0">
-            <table class="table align-items-center mb-0 w-100" id="tablaPasajerosAsientos">
-              <thead>
-                <tr>
-                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Asiento</th>
-                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Pasajero</th>
-                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tipo</th>
-                  <th class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
+            <div class="table-responsive p-0">
+                <table class="table align-items-center mb-0 w-100" id="tablaPasajerosAsientos">
+                <thead>
+                    <tr>
+                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Asiento</th>
+                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Pasajero</th>
+                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tipo</th>
+                    <th class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+                </table>
+            </div>
+            </div>
         </div>
-      </div>
 
+        </div>
     </div>
-  </div>
-</div>
+    </div>
 
             <!-- PASO 3: PAGO Y EMISIÓN -->
             <div class="wizard-step d-none" id="step-3">

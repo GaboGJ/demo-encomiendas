@@ -1,0 +1,84 @@
+/* =========================================================
+   plano-vehiculo.css
+   Plano visual de asientos (pasajes/new, configuración de asientos, ...)
+   El tamaño de celda se controla con --celda-plano y se reduce en móvil.
+   ========================================================= */
+
+:root { --celda-plano: 60px; --gap-plano: 8px; }
+
+@media (max-width: 767.98px) { :root { --celda-plano: 50px; --gap-plano: 6px; } }
+@media (max-width: 479.98px) { :root { --celda-plano: 40px; --gap-plano: 4px; } }
+
+.vehicle-blueprint-horizontal {
+  max-width: 100%;
+  min-height: 140px;
+  border: 4px solid #344767 !important;
+  border-radius: 20px 40px 40px 20px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 575.98px) {
+  .vehicle-blueprint-horizontal {
+    border-width: 3px !important;
+    border-radius: 14px 28px 28px 14px !important;
+    padding: .5rem !important;
+  }
+}
+
+/* width:max-content + margin auto = centrado seguro, con scroll si no cabe */
+.grid-asientos-piso {
+  display: grid;
+  gap: var(--gap-plano);
+  width: max-content;
+  margin: 12px auto;
+}
+
+.celda-elemento {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.celda-asiento {
+  background: #fff;
+  border: 2px solid #2dce89;
+  color: #2dce89;
+  font-weight: 700;
+  font-size: .8rem;
+  cursor: pointer;
+  flex-direction: column;
+  user-select: none;
+  transition: all .15s ease;
+}
+.celda-asiento:hover { background: rgba(45, 206, 137, .08); transform: translateY(-1px); }
+.celda-asiento:focus-visible { outline: 2px solid #344767; outline-offset: 1px; }
+.celda-asiento.seleccionado { background: #2dce89; border-color: #2dce89; color: #fff; }
+.celda-asiento.ocupado { background: #e9ecef; border-color: #adb5bd; color: #6c757d; cursor: not-allowed; }
+.celda-asiento.ocupado:hover { transform: none; background: #e9ecef; }
+
+.celda-especial {
+  background: #f8f9fa;
+  border: 1px dashed #adb5bd;
+  color: #6c757d;
+  font-size: .6rem;
+  text-align: center;
+  line-height: 1.1;
+  padding: 2px;
+}
+.celda-pasillo { background: transparent; border: none; }
+
+@media (max-width: 479.98px) {
+  .celda-asiento { font-size: .65rem; }
+  .celda-asiento .material-symbols-rounded,
+  .celda-especial .material-symbols-rounded { font-size: 1rem; }
+  .celda-especial { font-size: .5rem; }
+}
+
+/* Leyenda */
+.leyenda-punto { display: inline-block; width: 12px; height: 12px; border-radius: 4px; }
+.leyenda-disponible { background: #fff; border: 2px solid #2dce89; }
+.leyenda-seleccionado { background: #2dce89; }
+.leyenda-ocupado { background: #e9ecef; border: 2px solid #adb5bd; }

@@ -1,0 +1,41 @@
+/* =========================================================
+   wizard-responsive.css
+   Utilidades reutilizables para vistas tipo "wizard" (pasos)
+   ========================================================= */
+
+/* Bootstrap 5 NO trae w-sm-auto: sin esto los botones del footer
+   quedaban al 100% también en escritorio. */
+@media (min-width: 576px) {
+  .w-sm-auto { width: auto !important; }
+}
+
+.min-width-0 { min-width: 0; }
+
+/* Stepper: en pantallas chicas solo iconos + etiqueta "Paso X de N" */
+.stepper-pasos .step-indicator { min-width: 0; }
+.stepper-pasos .btn-icon-only { flex-shrink: 0; }
+.lbl-paso-movil {
+  font-size: .75rem;
+  font-weight: 700;
+  text-align: center;
+  margin: .25rem 0 0;
+}
+
+/* Textos largos (badges, resúmenes) no deben desbordar */
+.badge-wrap {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+}
+.texto-quiebra { overflow-wrap: anywhere; }
+
+/* Footer de navegación: botones apilados en móvil, en fila desde sm */
+.wizard-footer .btn { white-space: nowrap; }
+@media (max-width: 575.98px) {
+  .wizard-footer { flex-direction: column; align-items: stretch !important; }
+  .wizard-footer > * { width: 100%; }
+  .wizard-footer .btn { width: 100%; }
+}
+
+/* Tablas dentro de tarjetas: nunca romper el layout de la página */
+.wizard-step .table-responsive { -webkit-overflow-scrolling: touch; }
