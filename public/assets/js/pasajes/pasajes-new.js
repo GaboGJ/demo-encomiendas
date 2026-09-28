@@ -4,6 +4,8 @@
    Se carga en el script general; solo actúa si existe #formVentaPasaje.
    Datos desde PHP: window.PASAJES_NEW = { baseUrl, turnos }
    Requiere: utils-ui.js, autocompletar.js, plano-vehiculo.js
+   La tabla #tablaPasajerosAsientos se inicializa en layouts/script.php
+   (como el resto de tablas); aquí solo se llena y se refresca.
    ========================================================= */
 (function (w, d) {
   'use strict';
@@ -234,20 +236,22 @@
     d.getElementById('lblTotalPagarAsientos').textContent = 'Bs. ' + (n * precio).toFixed(2);
   }
 
-  /* ---------- Tabla de pasajero por asiento ---------- */
+  /* ---------- Tabla de pasajero por asiento ----------
+     La tabla la crea layouts/script.php (inicializarDataTable). Aquí solo
+     se toma esa instancia, se llena con las filas y se recalcula el
+     responsive cuando el paso 2 ya es visible. */
   function inicializarDataTablePasajeros() {
-    if (dtPasajeros || typeof w.inicializarDataTable !== 'function') return;
-    dtPasajeros = w.inicializarDataTable('#tablaPasajerosAsientos', {
-      ordering: false,
-      placeholder: 'Buscar asiento...',
-      pageLength: 5,
-      columns: [
-        { data: 'asiento', className: 'text-xs font-weight-bold' },
-        { data: 'pasajero', className: 'text-xs font-weight-bold' },
-        { data: 'tipo', className: 'text-xs' },
-        { data: 'acciones', className: 'text-end', orderable: false }
-      ]
-    });
+    if (dtPasajeros) return;
+    if (w.jQuery && w.jQuery.fn.DataTable && w.jQuery.fn.DataTable.isDataTable('#tablaPasajerosAsientos')) {
+      dtPasajeros = w.jQuery('#tablaPasajerosAsientos').DataTable();
+    }
+  }
+
+  function refrescarTablaPasajeros() {
+    inicializarDataTablePasajeros();
+    if (!dtPasajeros) return;
+    dtPasajeros.columns.adjust();
+    if (dtPasajeros.responsive) dtPasajeros.responsive.recalc();
   }
 
   function renderizarListaPasajeros() {
@@ -261,14 +265,14 @@
     asientosSeleccionados.forEach(function (a, key) {
       var p = a.usar_comprador ? comp : a;
       var nombre = nombreCompleto(p) || (a.usar_comprador ? '(complete los datos del comprador en el paso 1)' : '-');
-      var ciTxt = p.ci ? ' <span class="text-xxs text-secondary d-block d-sm-inline">C.I. ' + esc(p.ci) + '</span>' : '';
+      var ciTxt = p.ci ? ' <span class="text-xxs text-secondary d-block">C.I. ' + esc(p.ci) + '</span>' : '';
       var tipo = a.usar_comprador
         ? '<span class="badge badge-sm bg-gradient-secondary">Comprador</span>'
         : '<span class="badge badge-sm bg-gradient-info">Otra persona</span>';
 
       filas.push({
         asiento: '<span class="badge bg-gradient-success">Asiento ' + esc(a.etiqueta) + '</span>',
-        pasajero: '<span class="texto-quiebra">' + esc(nombre) + '</span>' + ciTxt,
+        pasajero: '<span class="d-inline-block text-truncate align-bottom" style="max-width:150px" title="' + esc(nombre) + '">' + esc(nombre) + '</span>' + ciTxt,
         tipo: tipo,
         acciones:
           '<div class="d-flex align-items-center justify-content-end gap-1">' +
@@ -280,6 +284,7 @@
     });
 
     dtPasajeros.rows.add(filas).draw();
+    refrescarTablaPasajeros();
   }
 
   function editarPasajeroAsiento(key) {
@@ -407,7 +412,11 @@
     d.getElementById('btnNext').classList.toggle('d-none', pasoActual === TOTAL_PASOS);
     d.getElementById('btnSave').classList.toggle('d-none', pasoActual !== TOTAL_PASOS);
 
-    if (pasoActual === 2 && turnoSeleccionado) cargarAsientosTurno();
+    if (pasoActual === 2) {
+      if (turnoSeleccionado) cargarAsientosTurno();
+      // El paso ya es visible: ahora sí la tabla puede medirse bien
+      setTimeout(refrescarTablaPasajeros, 50);
+    }
     if (pasoActual === 3) {
       w.initNavPillsAnimados();
       previsualizarBoleto();

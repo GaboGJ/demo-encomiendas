@@ -21,6 +21,11 @@
   <link href="<?= URL; ?>/public/assets/css/vendor/responsive.bootstrap5.css" rel="stylesheet" type="text/css" />
   <link href="<?= URL; ?>/public/assets/css/tabs-animadas.css" rel="stylesheet" type="text/css" />
 
+  <!-- CSS GLOBALES REUTILIZABLES (wizards, buscador autocompletar, plano de vehículo) -->
+  <link href="<?= URL; ?>/public/assets/css/wizard-responsive.css" rel="stylesheet" type="text/css" />
+  <link href="<?= URL; ?>/public/assets/css/autocompletar.css" rel="stylesheet" type="text/css" />
+  <link href="<?= URL; ?>/public/assets/css/plano-vehiculo.css" rel="stylesheet" type="text/css" />
+
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 </head>

@@ -4,7 +4,12 @@
   <script src="<?= URL; ?>/public/assets/js/plugins/perfect-scrollbar.min.js"></script>
   <script src="<?= URL; ?>/public/assets/js/plugins/smooth-scrollbar.min.js"></script>
   <script src="<?= URL; ?>/public/assets/js/plugins/chartjs.min.js"></script>
- <script src="<?= URL; ?>/public/assets/js/tabs-animadas.js"></script>
+  <script src="<?= URL; ?>/public/assets/js/tabs-animadas.js"></script>
+
+  <!-- UTILIDADES GLOBALES REUTILIZABLES (el orden importa: utils-ui primero) -->
+  <script src="<?= URL; ?>/public/assets/js/utils-ui.js"></script>
+  <script src="<?= URL; ?>/public/assets/js/autocompletar.js"></script>
+  <script src="<?= URL; ?>/public/assets/js/plano-vehiculo.js"></script>
 
   <!-- JQUERY & DATATABLES SCRIPTS -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -31,7 +36,8 @@
         const url = '<?= URL ?>/encomiendas/imprimirActa?id=' + idEncomienda;
         lanzarImpresionIframe(url, onFinish);
     }
-        /**
+
+    /**
      * Imprime el Boleto de pasaje usando el mismo iframe oculto
      */
     function imprimirBoletoPasaje(idPasaje, onFinish) {
@@ -77,51 +83,11 @@
         iframe.src = url;
     }
 </script>
-  
-  <script>
-    var ctx = document.getElementById("chart-bars").getContext("2d");
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
-        datasets: [{
-          label: "Paquetes",
-          tension: 0.4,
-          borderWidth: 0,
-          borderRadius: 4,
-          borderSkipped: false,
-          backgroundColor: "#4CAF50",
-          data: [65, 80, 72, 95, 120, 142, 40],
-          barThickness: 'flex'
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { grid: { color: '#e5e5e5' }, ticks: { color: "#737373" } },
-          x: { grid: { display: false }, ticks: { color: '#737373' } }
-        }
-      }
-    });
 
-    var ctx2 = document.getElementById("chart-line").getContext("2d");
-    new Chart(ctx2, {
-      type: "line",
-      data: {
-        labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"],
-        datasets: [{
-          label: "Fletes",
-          tension: 0,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: "#4CAF50",
-          borderColor: "#4CAF50",
-          data: [12000, 14500, 13200, 18000, 21000, 25000, 23000, 28000, 31000],
-        }],
-      },
-      options: {
+<!-- GRÁFICAS DEL DASHBOARD (solo si existen en la página) -->
+<script>
+    (function () {
+      var opcionesBase = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
@@ -129,37 +95,73 @@
           y: { grid: { color: '#e5e5e5' }, ticks: { color: '#737373' } },
           x: { grid: { display: false }, ticks: { color: '#737373' } }
         }
-      }
-    });
+      };
 
-    var ctx3 = document.getElementById("chart-line-tasks").getContext("2d");
-    new Chart(ctx3, {
-      type: "line",
-      data: {
-        labels: ["Sem 1", "Sem 2", "Sem 3", "Sem 4"],
-        datasets: [{
-          label: "Efectividad %",
-          tension: 0,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: "#4CAF50",
-          borderColor: "#4CAF50",
-          data: [96, 98, 97, 99],
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { grid: { color: '#e5e5e5' }, ticks: { color: '#737373' } },
-          x: { grid: { display: false }, ticks: { color: '#737373' } }
-        }
+      var elBars = document.getElementById("chart-bars");
+      if (elBars) {
+        new Chart(elBars.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
+            datasets: [{
+              label: "Paquetes",
+              tension: 0.4,
+              borderWidth: 0,
+              borderRadius: 4,
+              borderSkipped: false,
+              backgroundColor: "#4CAF50",
+              data: [65, 80, 72, 95, 120, 142, 40],
+              barThickness: 'flex'
+            }],
+          },
+          options: opcionesBase
+        });
       }
-    });
 
-  </script>
-  <script>
+      var elLine = document.getElementById("chart-line");
+      if (elLine) {
+        new Chart(elLine.getContext("2d"), {
+          type: "line",
+          data: {
+            labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"],
+            datasets: [{
+              label: "Fletes",
+              tension: 0,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: "#4CAF50",
+              borderColor: "#4CAF50",
+              data: [12000, 14500, 13200, 18000, 21000, 25000, 23000, 28000, 31000],
+            }],
+          },
+          options: opcionesBase
+        });
+      }
+
+      var elTasks = document.getElementById("chart-line-tasks");
+      if (elTasks) {
+        new Chart(elTasks.getContext("2d"), {
+          type: "line",
+          data: {
+            labels: ["Sem 1", "Sem 2", "Sem 3", "Sem 4"],
+            datasets: [{
+              label: "Efectividad %",
+              tension: 0,
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: "#4CAF50",
+              borderColor: "#4CAF50",
+              data: [96, 98, 97, 99],
+            }],
+          },
+          options: opcionesBase
+        });
+      }
+    })();
+</script>
+
+<!-- HELPER GLOBAL DE DATATABLES -->
+<script>
     function inicializarDataTable(tableId, customOptions = {}) {
         var tableElement = $(tableId);
         if (tableElement.length === 0) return;
@@ -254,21 +256,19 @@
         var finalOptions = $.extend(true, {}, defaultOptions, customOptions);
         return tableElement.DataTable(finalOptions);
     }
+</script>
 
-   
-  </script>
-  <script>
+<!-- INICIALIZACIÓN DE TABLAS POR VISTA (cada una solo actúa si existe en la página) -->
+<script>
     $(document).ready(function() {
-        // 1. Inicializar la tabla visible por defecto
+
+        // --- Encomiendas (2 pestañas: la segunda se inicializa al mostrarse) ---
         inicializarDataTable('#datatable-encomiendas', { ordering: false, placeholder: 'Buscar envío...' });
 
-        // 2. Variable para controlar si la segunda tabla ya fue inicializada
         var llegadasInicializada = false;
-
-        // 3. Escuchar el cambio de pestañas de Bootstrap
         $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
             var targetTab = $(e.target).attr('href');
-            
+
             if (targetTab === '#tab-llegadas' && !llegadasInicializada) {
                 inicializarDataTable('#datatable-llegadas', { ordering: false, placeholder: 'Buscar llegada...' });
                 llegadasInicializada = true;
@@ -276,68 +276,58 @@
 
             $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
         });
-    });
-      $(document).ready(function() {
+
+        // --- Pasajes ---
         inicializarDataTable('#datatable-pasajes', { ordering: false, placeholder: 'Buscar boleto o pasajero...' });
-    });
-    $(document).ready(function() {
-        inicializarDataTable('#datatable-despachos', { ordering: false, placeholder: 'Buscar turno o chofer...' });
-    });
-        $(document).ready(function() {
-        inicializarDataTable('#datatable-cajas', { ordering: false, placeholder: 'Buscar caja o cajero...' });
-    });
-      $(document).ready(function() {
-        inicializarDataTable('#datatable-flotas', { ordering: false, placeholder: 'Buscar unidad o placa...' });
-    });
-      $(document).ready(function() {
-        inicializarDataTable('#datatable-conductores', { ordering: false, placeholder: 'Buscar conductor o socio...' });
-    });
-     $(document).ready(function() {
+
+        // Tabla "Pasajero por asiento" de pasajes/new. Las filas las dibuja
+        // pasajes-new.js; aquí solo se define la tabla y qué columnas se
+        // ocultan primero en pantallas chicas (menor número = más importante).
+        inicializarDataTable('#tablaPasajerosAsientos', {
+            ordering: false,
+            placeholder: 'Buscar asiento...',
+            pageLength: 5,
+            columns: [
+                { data: 'asiento',  className: 'text-xs font-weight-bold', responsivePriority: 1 },
+                { data: 'pasajero', className: 'text-xs font-weight-bold', responsivePriority: 2 },
+                { data: 'tipo',     className: 'text-xs',                  responsivePriority: 4 },
+                { data: 'acciones', className: 'text-end', orderable: false, responsivePriority: 3 }
+            ]
+        });
+
+        // --- Otras vistas ---
+        inicializarDataTable('#datatable-despachos',    { ordering: false, placeholder: 'Buscar turno o chofer...' });
+        inicializarDataTable('#datatable-cajas',        { ordering: false, placeholder: 'Buscar caja o cajero...' });
+        inicializarDataTable('#datatable-flotas',       { ordering: false, placeholder: 'Buscar unidad o placa...' });
+        inicializarDataTable('#datatable-conductores',  { ordering: false, placeholder: 'Buscar conductor o socio...' });
+        inicializarDataTable('#datatable-vehiculos',    { ordering: false, placeholder: 'Buscar vehículo o placa...' });
+        inicializarDataTable('#datatable-usuarios',     { ordering: false, placeholder: 'Buscar usuario...' });
+        inicializarDataTable('#datatable-roles',        { ordering: false, placeholder: 'Buscar rol...' });
+        inicializarDataTable('#datatable-sindicatos',   { ordering: false, placeholder: 'Buscar sindicato o secretario...' });
+        inicializarDataTable('#datatable-reportes',     { ordering: false, placeholder: 'Buscar en el reporte...' });
+
+        // --- Rutas + modal de edición de tarifa ---
         inicializarDataTable('#datatable-rutas', { ordering: false, placeholder: 'Buscar ruta o destino...' });
 
         var modalEditarTarifa = document.getElementById('modalEditarTarifa');
         if (modalEditarTarifa) {
-          modalEditarTarifa.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var ruta = button.getAttribute('data-ruta');
-            var pasaje = button.getAttribute('data-pasaje');
-            var encomienda = button.getAttribute('data-encomienda');
-
-            var modalInputRuta = modalEditarTarifa.querySelector('#inputRutaNombre');
-            var modalInputPasaje = modalEditarTarifa.querySelector('#inputTarifaPasaje');
-            var modalInputEncomienda = modalEditarTarifa.querySelector('#inputTarifaEncomienda');
-
-            modalInputRuta.value = ruta;
-            modalInputPasaje.value = pasaje;
-            modalInputEncomienda.value = encomienda;
-          });
+            modalEditarTarifa.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                modalEditarTarifa.querySelector('#inputRutaNombre').value = button.getAttribute('data-ruta');
+                modalEditarTarifa.querySelector('#inputTarifaPasaje').value = button.getAttribute('data-pasaje');
+                modalEditarTarifa.querySelector('#inputTarifaEncomienda').value = button.getAttribute('data-encomienda');
+            });
         }
-    });
-      $(document).ready(function() {
-        inicializarDataTable('#datatable-vehiculos', { ordering: false, placeholder: 'Buscar vehículo o placa...' });
-    });
-     $(document).ready(function() {
-        inicializarDataTable('#datatable-usuarios', { ordering: false, placeholder: 'Buscar usuario...' });
-    });
-       $(document).ready(function() {
-        inicializarDataTable('#datatable-roles', { ordering: false, placeholder: 'Buscar rol...' });
     });
 
     function cargarPermisosRol(rol) {
       document.getElementById('nombreRolSeleccionadoText').innerHTML = 'Configurando matriz CRUD para: <strong>' + rol + '</strong>';
     }
-    $(document).ready(function() {
-        // Inicializar la tabla de sindicatos
-        inicializarDataTable('#datatable-sindicatos', { ordering: false, placeholder: 'Buscar sindicato o secretario...' });
-    });
-    // Inicializar DataTable para la tabla de reportes
-  $(document).ready(function() {
-    inicializarDataTable('#datatable-reportes', { ordering: false, placeholder: 'Buscar en el reporte...' });
-  });
-   $(document).ready(function() {
-    inicializarDataTable('#datatable-reportes', { ordering: false, placeholder: 'Buscar en el reporte...' });
-  });
 </script>
+
+  <!-- LÓGICA ESPECÍFICA DE PASAJES/NEW (solo actúa si existe #formVentaPasaje) -->
+  <script src="<?= URL; ?>/public/assets/js/pasajes/pasajes-new.js"></script>
+
   <script src="<?= URL; ?>/public/assets/js/material-dashboard.min.js?v=3.2.0"></script>
 
   </body>
