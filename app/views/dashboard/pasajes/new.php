@@ -9,13 +9,13 @@
           <div class="row align-items-center g-3">
             <div class="col-12 text-center text-md-start">
               <h5 class="font-weight-bolder text-dark mb-0">Venta de Pasaje</h5>
-              <p class="text-xs text-secondary mb-0">Seleccione el chofer/vehículo en turno (o deje la venta en espera de asignación), registre al comprador y emita el boleto</p>
+              <p class="text-xs text-secondary mb-0">Seleccione el turno (chofer/vehículo), registre al comprador, elija los asientos y a nombre de quién viaja cada uno</p>
             </div>
           </div>
 
           <div class="d-flex justify-content-between align-items-center text-center px-1 px-md-4 mt-4 py-2" id="contenedor-pasos">
             <div class="step-indicator flex-fill min-width-0 px-1" id="indicator-step-1">
-              <button type="button" class="btn btn-icon-only btn-rounded bg-gradient-success text-white mb-1 shadow-none" onclick="irAlPasoDirecto(1)">
+              <button type="button" class="btn btn-icon-only btn-rounded bg-gradient-success text-white mb-1 shadow-none" onclick="irAlPaso(1)">
                 <i class="material-symbols-rounded text-sm">departure_board</i>
               </button>
               <span class="d-none d-sm-block text-xs font-weight-bold text-dark text-truncate">1. Turno y Comprador</span>
@@ -24,16 +24,16 @@
             <div class="border-top border-2 flex-fill opacity-3" id="line-step-2"></div>
 
             <div class="step-indicator flex-fill min-width-0 px-1" id="indicator-step-2">
-              <button type="button" class="btn btn-icon-only btn-rounded bg-gray-200 text-secondary mb-1 shadow-none" onclick="irAlPasoDirecto(2)">
+              <button type="button" class="btn btn-icon-only btn-rounded bg-gray-200 text-secondary mb-1 shadow-none" onclick="irAlPaso(2)">
                 <i class="material-symbols-rounded text-sm">event_seat</i>
               </button>
-              <span class="d-none d-sm-block text-xs font-weight-bold text-secondary text-truncate">2. Asientos / Cupo</span>
+              <span class="d-none d-sm-block text-xs font-weight-bold text-secondary text-truncate">2. Asientos y Pasajeros</span>
             </div>
 
             <div class="border-top border-2 flex-fill opacity-3" id="line-step-3"></div>
 
             <div class="step-indicator flex-fill min-width-0 px-1" id="indicator-step-3">
-              <button type="button" class="btn btn-icon-only btn-rounded bg-gray-200 text-secondary mb-1 shadow-none" onclick="irAlPasoDirecto(3)">
+              <button type="button" class="btn btn-icon-only btn-rounded bg-gray-200 text-secondary mb-1 shadow-none" onclick="irAlPaso(3)">
                 <i class="material-symbols-rounded text-sm">print</i>
               </button>
               <span class="d-none d-sm-block text-xs font-weight-bold text-secondary text-truncate">3. Pago y Emisión</span>
@@ -60,9 +60,9 @@
                     </div>
 
                     <div class="input-group input-group-outline my-2 is-filled">
-                      <label class="form-label">Turno Disponible</label>
+                      <label class="form-label">Turno Disponible *</label>
                       <select class="form-control" id="selectTurno" onchange="onCambioTurno()">
-                        <option value="">-- Sin turno asignado (venta en espera) --</option>
+                        <option value="" selected disabled>-- Seleccione el turno --</option>
                         <?php if (!empty($turnos_disponibles)): ?>
                           <?php foreach ($turnos_disponibles as $t): ?>
                             <?php
@@ -91,7 +91,9 @@
                     <?php if (empty($turnos_disponibles)): ?>
                       <p class="text-xxs text-warning font-weight-bold mt-2 mb-0">
                         <i class="material-symbols-rounded text-xs align-middle">info</i>
-                        No hay ningún turno activo en esta sucursal. Puede continuar y la venta quedará en espera de asignación.
+                        No hay ningún turno activo en esta sucursal. Registre uno en
+                        <a href="<?= rtrim(URL, '/') ?>/despachos/new" class="text-success">Despachos</a>
+                        antes de vender pasajes.
                       </p>
                     <?php endif; ?>
 
@@ -114,28 +116,6 @@
                         <span class="text-xxs font-weight-bold text-success" id="lblInfoPrecio">Bs. 0.00</span>
                       </div>
                     </div>
-
-                    <!-- Panel "en espera" (visible cuando NO hay turno seleccionado) -->
-                    <div id="panelEnEspera" class="mt-3 p-3 border border-radius-md bg-light">
-                      <p class="text-xxs text-secondary mb-2">
-                        <i class="material-symbols-rounded text-xs align-middle text-warning">schedule</i>
-                        Sin turno, el pasaje se registra <strong>en espera</strong>: quedará pendiente hasta que se le asigne un chofer y vehículo desde Despachos.
-                      </p>
-                      <div class="row g-2">
-                        <div class="col-6">
-                          <div class="input-group input-group-outline my-2">
-                            <label class="form-label">Cantidad de Pasajes *</label>
-                            <input type="number" min="1" step="1" class="form-control" id="inputCantidadPasajes" value="1" oninput="recalcularTotalEnEspera()">
-                          </div>
-                        </div>
-                        <div class="col-6">
-                          <div class="input-group input-group-outline my-2">
-                            <label class="form-label">Precio Unitario (Bs.) *</label>
-                            <input type="number" min="0" step="0.5" class="form-control" id="inputPrecioManual" value="0.00" oninput="recalcularTotalEnEspera()">
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -144,7 +124,7 @@
                   <div class="p-3 border border-radius-md bg-white h-100">
                     <div class="d-flex align-items-center mb-3">
                       <span class="material-symbols-rounded text-success me-2">person</span>
-                      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador / Pasajero</h6>
+                      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos del Comprador (quien paga)</h6>
                     </div>
 
                     <div class="row g-2">
@@ -190,11 +170,10 @@
               </div>
             </div>
 
-            <!-- PASO 2: ASIENTOS DEL TURNO O RESUMEN EN ESPERA -->
+            <!-- PASO 2: PLANO DE ASIENTOS Y PASAJERO POR ASIENTO -->
             <div class="wizard-step d-none" id="step-2">
 
-              <!-- Panel de asientos: visible si hay turno seleccionado -->
-              <div id="panelAsientos" class="d-none">
+              <div id="panelAsientos">
                 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2">
                   <div class="d-flex align-items-center">
                     <span class="material-symbols-rounded text-success me-2">event_seat</span>
@@ -214,7 +193,7 @@
                   </div>
                 </div>
 
-                <!-- Paginador de Piso (solo se muestra si el vehículo tiene más de un piso) -->
+                <!-- Paginador de Piso (solo si el vehículo tiene más de un piso) -->
                 <div class="d-none align-items-center justify-content-center gap-3 mt-3" id="wrapperPisosAsientos">
                   <button type="button" class="btn btn-icon-only btn-rounded btn-outline-success btn-sm mb-0" id="btnPisoAnterior" onclick="cambiarPisoPaginador(-1)">
                     <i class="material-symbols-rounded text-sm">chevron_left</i>
@@ -229,18 +208,17 @@
                   <span class="text-xs font-weight-bold text-dark" id="lblCantAsientos">0 asiento(s)</span>
                   <h5 class="text-success mb-0 font-weight-bolder" id="lblTotalPagarAsientos">Bs. 0.00</h5>
                 </div>
-              </div>
 
-              <!-- Panel resumen: visible si la venta quedará en espera -->
-              <div id="panelResumenEspera" class="d-none">
-                <div class="d-flex align-items-center mb-2">
-                  <span class="material-symbols-rounded text-warning me-2">schedule</span>
-                  <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Venta en Espera de Asignación</h6>
-                </div>
-                <div class="p-4 border border-radius-md bg-white text-center">
-                  <p class="text-xs text-secondary mb-3">No se seleccionó un turno. Este pasaje quedará registrado como <strong>Pendiente</strong> y podrá asignarse a un chofer/vehículo más adelante desde Despachos.</p>
-                  <h4 class="font-weight-bolder text-dark mb-1" id="lblCantidadEsperaResumen">1 pasaje(s)</h4>
-                  <h5 class="text-success font-weight-bolder mb-0" id="lblTotalEsperaResumen">Bs. 0.00</h5>
+                <!-- PASAJERO POR ASIENTO -->
+                <div class="mt-3 p-3 border border-radius-md bg-white">
+                  <div class="d-flex align-items-center mb-1">
+                    <span class="material-symbols-rounded text-success me-2">groups</span>
+                    <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Pasajero por Asiento</h6>
+                  </div>
+                  <p class="text-xxs text-secondary mb-2">Por defecto cada asiento queda a nombre del comprador. Use el lápiz para asignarlo a otra persona.</p>
+                  <div id="listaPasajerosAsientos">
+                    <div class="text-xs text-secondary">Aún no seleccionó asientos.</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -282,7 +260,7 @@
                     <div class="p-3 bg-gray-100 border-radius-lg mt-4">
                       <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="text-xs text-secondary">Estado de la Venta:</span>
-                        <span class="badge bg-gradient-success text-xxs" id="badgeEstadoVenta">Asignado</span>
+                        <span class="badge bg-gradient-success text-xxs">Asignado</span>
                       </div>
                       <div class="d-flex justify-content-between align-items-center">
                         <span class="text-xs font-weight-bold text-dark">Total a Cobrar:</span>
@@ -308,7 +286,7 @@
 
                     <div class="p-2 bg-gray-100 border-radius-md mb-2">
                       <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block mb-1">Ruta / Turno</span>
-                      <p class="text-xs font-weight-bold text-dark mb-0" id="resRuta">Sin turno asignado (en espera)</p>
+                      <p class="text-xs font-weight-bold text-dark mb-0" id="resRuta">-</p>
                     </div>
 
                     <div class="p-2 border border-radius-md mb-2">
@@ -318,8 +296,8 @@
                     </div>
 
                     <div class="p-2 border border-radius-md">
-                      <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block mb-1">Detalle de Cobro</span>
-                      <p class="text-xs font-weight-bold text-dark mb-0" id="resAsientos">1 pasaje en espera</p>
+                      <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block mb-1">Asientos y Pasajeros</span>
+                      <div class="text-xs font-weight-bold text-dark mb-1" id="resAsientos">-</div>
                       <p class="text-xxs text-success font-weight-bold mb-0">Total: <span id="resTotal">Bs. 0.00</span></p>
                     </div>
                   </div>
@@ -355,6 +333,64 @@
 
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PASAJERO DE UN ASIENTO (cuando NO es el comprador) -->
+<div class="modal fade" id="modalPasajeroAsiento" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-radius-xl">
+      <div class="modal-header bg-gradient-success text-white">
+        <h5 class="modal-title text-white font-weight-bold">
+          <i class="material-symbols-rounded me-1 align-middle">person_pin</i> Pasajero del Asiento <span id="lblAsientoModal"></span>
+        </h5>
+        <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-xxs text-secondary mb-2">Indique quién viajará en este asiento. Si el C.I. ya está registrado se completan los datos automáticamente.</p>
+        <input type="hidden" id="pas_id_elemento">
+        <div class="row g-2">
+          <div class="col-12 col-md-4">
+            <div class="input-group input-group-outline my-2">
+              <label class="form-label">Nº Carnet / C.I. *</label>
+              <input type="text" class="form-control" id="pas_ci" onblur="buscarPasajeroModal()">
+            </div>
+             <div class="input-group input-group-outline my-2">
+              <label class="form-label">Celular</label>
+              <input type="text" class="form-control" id="pas_celular">
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="input-group input-group-outline my-2">
+              <label class="form-label">Nombres *</label>
+              <input type="text" class="form-control" id="pas_nombres">
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="input-group input-group-outline my-2">
+              <label class="form-label">Apellido Paterno *</label>
+              <input type="text" class="form-control" id="pas_paterno">
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="input-group input-group-outline my-2">
+              <label class="form-label">Apellido Materno</label>
+              <input type="text" class="form-control" id="pas_materno">
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="input-group input-group-outline my-2">
+              <label class="form-label">Celular</label>
+              <input type="text" class="form-control" id="pas_celular">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-gray-100">
+        <button type="button" class="btn btn-sm bg-gradient-secondary mb-0" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm bg-gradient-success mb-0" onclick="guardarPasajeroAsiento()">Guardar Pasajero</button>
+      </div>
     </div>
   </div>
 </div>
@@ -482,53 +518,113 @@ function initCustomNavPills() {
 <!-- SCRIPT DE LÓGICA DEL WIZARD -->
 <script>
 let pasoActual = 1;
-let turnoSeleccionado = null; // { id, precio, id_modelo, destino, vehiculo, chofer, capacidad, ocupados }
+let turnoSeleccionado = null; // { id, precio, destino, vehiculo, chofer, capacidad, ocupados }
 const baseUrl = '<?php echo rtrim(URL, "/"); ?>';
 
 // --- Estado del plano visual de asientos ---
-let pisosPlano = [];              // [{ id_piso, numero_piso, filas_piso, columnas_piso }, ...]
-let elementosPlano = [];          // Todos los elementos (asientos + especiales) del modelo
-let pisoActivoPlano = null;       // id_piso actualmente visible en el plano
-let asientosSeleccionados = new Set(); // id_elemento de los asientos elegidos (persiste entre pisos)
+let pisosPlano = [];
+let elementosPlano = [];
+let pisoActivoPlano = null;
+
+// Asientos elegidos: key (id_elemento como string) -> datos del pasajero de ESE asiento.
+//   usar_comprador = true  -> el asiento va a nombre del comprador (se resuelve al enviar,
+//                             así si el comprador se edita después, el asiento lo sigue).
+//   usar_comprador = false -> pasajero distinto: ci / nombres / paterno / materno / celular.
+let asientosSeleccionados = new Map();
 
 function redireccionarAlListado() {
   window.location.href = baseUrl + '/pasajes';
 }
 
-// --- Búsqueda de comprador por CI (reutiliza el endpoint ya usado en Encomiendas) ---
-function buscarComprador() {
-  const ci = document.getElementById('comprador_ci').value.trim();
-  if (!ci) return;
+// --- Utilidades ---
+function valorInput(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
 
+// Asigna un valor a un input de Material Dashboard y sube la etiqueta flotante
+// (clase is-filled) para que no se superponga con el texto.
+function setValorInput(id, valor) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = valor || '';
+  const grupo = el.closest('.input-group');
+  if (grupo) grupo.classList.toggle('is-filled', el.value !== '');
+}
+
+function escaparHtmlAsientos(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function datosComprador() {
+  return {
+    ci: valorInput('comprador_ci'),
+    nombres: valorInput('comprador_nombres'),
+    paterno: valorInput('comprador_paterno'),
+    materno: valorInput('comprador_materno'),
+    celular: valorInput('comprador_celular')
+  };
+}
+
+function nombreCompleto(p) {
+  return [p.nombres, p.paterno, p.materno].filter(Boolean).join(' ');
+}
+
+// Busca una persona por C.I. (mismo endpoint usado en Encomiendas) y llama a cb(persona | null)
+function buscarPersonaPorCi(ci, cb) {
+  if (!ci) return;
   fetch(`${baseUrl}/personas/buscarPorCiJson?ci=${encodeURIComponent(ci)}`)
     .then(res => res.json())
     .then(data => {
       if (data.success && data.persona) {
-        document.getElementById('comprador_nombres').value = data.persona.nombres_persona || data.persona.nombre_persona || '';
-        document.getElementById('comprador_paterno').value = data.persona.paterno_persona || data.persona.apellido_paterno_persona || '';
-        document.getElementById('comprador_materno').value = data.persona.materno_persona || data.persona.apellido_materno_persona || '';
-        document.getElementById('comprador_celular').value = data.persona.celular_persona || data.persona.telefono_persona || '';
+        const p = data.persona;
+        cb({
+          nombres: p.nombres_persona || p.nombre_persona || '',
+          paterno: p.paterno_persona || p.apellido_paterno_persona || '',
+          materno: p.materno_persona || p.apellido_materno_persona || '',
+          celular: p.celular_persona || p.telefono_persona || ''
+        });
       }
     })
     .catch(() => {});
+}
+
+function buscarComprador() {
+  buscarPersonaPorCi(valorInput('comprador_ci'), function (p) {
+    setValorInput('comprador_nombres', p.nombres);
+    setValorInput('comprador_paterno', p.paterno);
+    setValorInput('comprador_materno', p.materno);
+    setValorInput('comprador_celular', p.celular);
+    renderizarListaPasajeros();
+  });
+}
+
+function buscarPasajeroModal() {
+  buscarPersonaPorCi(valorInput('pas_ci'), function (p) {
+    setValorInput('pas_nombres', p.nombres);
+    setValorInput('pas_paterno', p.paterno);
+    setValorInput('pas_materno', p.materno);
+    setValorInput('pas_celular', p.celular);
+  });
 }
 
 // --- Selección de turno ---
 function onCambioTurno() {
   const sel = document.getElementById('selectTurno');
   const infoTurno = document.getElementById('infoTurnoSeleccionado');
-  const panelEnEspera = document.getElementById('panelEnEspera');
 
   // Cambiar de turno invalida cualquier selección de asientos previa.
   asientosSeleccionados.clear();
   pisosPlano = [];
   elementosPlano = [];
   pisoActivoPlano = null;
+  renderizarListaPasajeros();
 
   if (!sel.value) {
     turnoSeleccionado = null;
     infoTurno.classList.add('d-none');
-    panelEnEspera.classList.remove('d-none');
     return;
   }
 
@@ -549,28 +645,18 @@ function onCambioTurno() {
   document.getElementById('lblInfoPrecio').textContent = 'Bs. ' + turnoSeleccionado.precio.toFixed(2);
 
   infoTurno.classList.remove('d-none');
-  panelEnEspera.classList.add('d-none');
 }
 
-function recalcularTotalEnEspera() {
-  const cant = Math.max(1, parseInt(document.getElementById('inputCantidadPasajes').value) || 1);
-  const precio = parseFloat(document.getElementById('inputPrecioManual').value) || 0;
-  document.getElementById('lblCantidadEsperaResumen').textContent = cant + ' pasaje(s)';
-  document.getElementById('lblTotalEsperaResumen').textContent = 'Bs. ' + (cant * precio).toFixed(2);
-}
-
-// --- Carga del plano visual del vehículo (paso 2, con turno seleccionado) ---
+// --- Carga del plano visual del vehículo (paso 2) ---
 function cargarAsientosTurno() {
-  const mensaje = document.getElementById('mensajePlanoAsientos');
   const contenedor = document.getElementById('contenedorPlanoAsientos');
-  if (mensaje) mensaje.textContent = 'Cargando plano del vehículo...';
   contenedor.innerHTML = '<div class="text-center text-xs text-secondary py-4" id="mensajePlanoAsientos">Cargando plano del vehículo...</div>';
 
   fetch(`${baseUrl}/pasajes/obtenerConfiguracionTurno?id_turno=${turnoSeleccionado.id}`)
     .then(r => r.json())
     .then(res => {
       if (!res.success) {
-        contenedor.innerHTML = `<div class="text-center text-xs text-danger py-4">${res.message}</div>`;
+        contenedor.innerHTML = `<div class="text-center text-xs text-danger py-4">${escaparHtmlAsientos(res.message)}</div>`;
         return;
       }
       turnoSeleccionado.precio = parseFloat(res.turno.precio_pasaje_turno) || turnoSeleccionado.precio;
@@ -581,19 +667,19 @@ function cargarAsientosTurno() {
 
       normalizarOrientacionHorizontal();
 
-      // Al recargar (por ejemplo, al volver a este paso), se descarta de la
-      // selección cualquier asiento que ya no exista o que haya sido vendido
-      // por otro cajero mientras tanto, para no enviar datos obsoletos.
+      // Se descarta de la selección cualquier asiento que ya no exista o que
+      // otro cajero haya vendido mientras tanto.
       const idsValidos = new Set(
         elementosPlano.filter(e => e.es_asiento && !e.ocupado).map(e => String(e.id_elemento))
       );
-      asientosSeleccionados.forEach(id => {
-        if (!idsValidos.has(String(id))) asientosSeleccionados.delete(id);
+      Array.from(asientosSeleccionados.keys()).forEach(k => {
+        if (!idsValidos.has(k)) asientosSeleccionados.delete(k);
       });
 
       if (!pisosPlano.length) {
         contenedor.innerHTML = '<div class="text-center text-xs text-secondary py-4">Este modelo de vehículo no tiene un plano de asientos configurado.</div>';
         recalcularTotalAsientos();
+        renderizarListaPasajeros();
         return;
       }
 
@@ -601,15 +687,13 @@ function cargarAsientosTurno() {
       actualizarPaginadorPisos();
       renderizarPlanoPiso();
       recalcularTotalAsientos();
+      renderizarListaPasajeros();
     })
     .catch(() => {
       contenedor.innerHTML = '<div class="text-center text-xs text-danger py-4">Error al cargar el plano del vehículo.</div>';
     });
 }
 
-// Muestra el paginador de piso solo cuando el vehículo tiene más de un piso,
-// actualiza la etiqueta "Piso X de N" y habilita/deshabilita las flechas en
-// los extremos (primer y último piso).
 function actualizarPaginadorPisos() {
   const wrapper = document.getElementById('wrapperPisosAsientos');
   const lbl = document.getElementById('lblPisoActual');
@@ -634,7 +718,6 @@ function actualizarPaginadorPisos() {
   btnSiguiente.disabled = (indiceActual >= pisosPlano.length - 1);
 }
 
-// Avanza/retrocede de piso con el paginador (delta: -1 anterior, 1 siguiente).
 function cambiarPisoPaginador(delta) {
   const indiceActual = pisosPlano.findIndex(p => p.id_piso === pisoActivoPlano);
   const nuevoIndice = indiceActual + delta;
@@ -644,12 +727,6 @@ function cambiarPisoPaginador(delta) {
   pisoActivoPlano = pisosPlano[nuevoIndice].id_piso;
   actualizarPaginadorPisos();
   renderizarPlanoPiso();
-}
-
-function escaparHtmlAsientos(str) {
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
 }
 
 function iconoElementoEspecial(tipo) {
@@ -739,10 +816,8 @@ function renderizarPlanoPiso() {
   contenedor.innerHTML = html;
 }
 
-// Si el piso quedó configurado más "alto" que "ancho" (más filas que
-// columnas), se transpone fila<->columna para que el plano SIEMPRE se
-// vea horizontalmente orientado, como un vehículo real (más largo que
-// ancho), sin depender de cómo se haya cargado la configuración original.
+// Si el piso quedó configurado más "alto" que "ancho", se transpone para que
+// el plano SIEMPRE se vea horizontal, como un vehículo real.
 function normalizarOrientacionHorizontal() {
   pisosPlano.forEach(piso => {
     const filas    = parseInt(piso.filas_piso) || 1;
@@ -770,11 +845,18 @@ function toggleAsiento(idElemento, ocupado) {
   if (asientosSeleccionados.has(key)) {
     asientosSeleccionados.delete(key);
   } else {
-    asientosSeleccionados.add(key);
+    const el = elementosPlano.find(e => String(e.id_elemento) === key);
+    asientosSeleccionados.set(key, {
+      id_elemento: key,
+      etiqueta: el ? el.dato_elemento : key,
+      usar_comprador: true,
+      ci: '', nombres: '', paterno: '', materno: '', celular: ''
+    });
   }
 
   renderizarPlanoPiso();
   recalcularTotalAsientos();
+  renderizarListaPasajeros();
 }
 
 function recalcularTotalAsientos() {
@@ -784,51 +866,162 @@ function recalcularTotalAsientos() {
   document.getElementById('lblTotalPagarAsientos').textContent = 'Bs. ' + (n * precio).toFixed(2);
 }
 
-function obtenerAsientosSeleccionados() {
-  return Array.from(asientosSeleccionados);
+// --- Pasajero por asiento ---
+function renderizarListaPasajeros() {
+  const cont = document.getElementById('listaPasajerosAsientos');
+  if (!cont) return;
+
+  if (!asientosSeleccionados.size) {
+    cont.innerHTML = '<div class="text-xs text-secondary">Aún no seleccionó asientos.</div>';
+    return;
+  }
+
+  const comp = datosComprador();
+  let html = '';
+
+  asientosSeleccionados.forEach((a, key) => {
+    const p = a.usar_comprador ? comp : a;
+    const nombre = nombreCompleto(p) || (a.usar_comprador ? '(complete los datos del comprador en el paso 1)' : '-');
+    const etiquetaPersona = a.usar_comprador
+      ? '<span class="badge badge-sm bg-gradient-secondary ms-1">Comprador</span>'
+      : `<span class="badge badge-sm bg-gradient-info ms-1">Otra persona</span>`;
+    const ciTxt = p.ci ? `<span class="text-xxs text-secondary ms-1">C.I. ${escaparHtmlAsientos(p.ci)}</span>` : '';
+
+    html += `
+      <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge bg-gradient-success">Asiento ${escaparHtmlAsientos(a.etiqueta)}</span>
+          <span class="text-xs font-weight-bold text-dark">${escaparHtmlAsientos(nombre)}</span>
+          ${etiquetaPersona}${ciTxt}
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          ${a.usar_comprador ? '' : `<button type="button" class="btn btn-link text-secondary p-1 m-0" title="Volver al comprador" onclick="restablecerPasajeroAsiento('${key}')"><i class="material-symbols-rounded text-sm">undo</i></button>`}
+          <button type="button" class="btn btn-link text-success p-1 m-0" title="Cambiar pasajero" onclick="editarPasajeroAsiento('${key}')">
+            <i class="material-symbols-rounded text-sm">edit</i>
+          </button>
+        </div>
+      </div>`;
+  });
+
+  cont.innerHTML = html;
+}
+
+function editarPasajeroAsiento(key) {
+  const a = asientosSeleccionados.get(key);
+  if (!a) return;
+
+  const base = a.usar_comprador ? { ci: '', nombres: '', paterno: '', materno: '', celular: '' } : a;
+
+  document.getElementById('pas_id_elemento').value = key;
+  document.getElementById('lblAsientoModal').textContent = a.etiqueta;
+  setValorInput('pas_ci', base.ci);
+  setValorInput('pas_nombres', base.nombres);
+  setValorInput('pas_paterno', base.paterno);
+  setValorInput('pas_materno', base.materno);
+  setValorInput('pas_celular', base.celular);
+
+  const modalEl = document.getElementById('modalPasajeroAsiento');
+  (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
+}
+
+function guardarPasajeroAsiento() {
+  const key = document.getElementById('pas_id_elemento').value;
+  const a = asientosSeleccionados.get(key);
+  if (!a) return;
+
+  const ci = valorInput('pas_ci');
+  const nombres = valorInput('pas_nombres');
+  const paterno = valorInput('pas_paterno');
+
+  if (!ci || !nombres || !paterno) {
+    Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Complete el C.I., nombres y apellido paterno del pasajero.' });
+    return;
+  }
+
+  if (ci === datosComprador().ci) {
+    // Mismo C.I. que el comprador: es la misma persona.
+    a.usar_comprador = true;
+  } else {
+    a.usar_comprador = false;
+    a.ci = ci;
+    a.nombres = nombres;
+    a.paterno = paterno;
+    a.materno = valorInput('pas_materno');
+    a.celular = valorInput('pas_celular');
+  }
+
+  const modalEl = document.getElementById('modalPasajeroAsiento');
+  const modalObj = bootstrap.Modal.getInstance(modalEl);
+  if (modalObj) modalObj.hide();
+
+  renderizarListaPasajeros();
+}
+
+function restablecerPasajeroAsiento(key) {
+  const a = asientosSeleccionados.get(key);
+  if (!a) return;
+  a.usar_comprador = true;
+  renderizarListaPasajeros();
+}
+
+// Lista enviada al servidor: una entrada por asiento, con su pasajero.
+function payloadAsientos() {
+  return Array.from(asientosSeleccionados.values()).map(a => {
+    const base = { id_elemento: parseInt(a.id_elemento), usar_comprador: a.usar_comprador };
+    if (a.usar_comprador) return base;
+    return Object.assign(base, { ci: a.ci, nombres: a.nombres, paterno: a.paterno, materno: a.materno, celular: a.celular });
+  });
 }
 
 function calcularTotalVenta() {
-  if (turnoSeleccionado) {
-    return obtenerAsientosSeleccionados().length * turnoSeleccionado.precio;
-  }
-  const cant = Math.max(1, parseInt(document.getElementById('inputCantidadPasajes').value) || 1);
-  const precio = parseFloat(document.getElementById('inputPrecioManual').value) || 0;
-  return cant * precio;
+  return turnoSeleccionado ? asientosSeleccionados.size * turnoSeleccionado.precio : 0;
 }
 
 // --- Navegación del wizard ---
+function validarPaso(paso) {
+  if (paso === 1) {
+    const ci = valorInput('comprador_ci');
+    const nombres = valorInput('comprador_nombres');
+    const paterno = valorInput('comprador_paterno');
+
+    if (!turnoSeleccionado) {
+      Swal.fire({ icon: 'warning', title: 'Seleccione un turno', text: 'Debe elegir el turno (chofer/vehículo) para el que vende el pasaje.' });
+      return false;
+    }
+    if (!ci || !nombres || !paterno) {
+      Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Complete el C.I., nombres y apellido paterno del comprador.' });
+      return false;
+    }
+  }
+
+  if (paso === 2) {
+    if (asientosSeleccionados.size === 0) {
+      Swal.fire({ icon: 'warning', title: 'Sin Asientos', text: 'Debe seleccionar al menos un asiento disponible.' });
+      return false;
+    }
+  }
+  return true;
+}
+
 function cambiarPaso(direccion) {
   const nuevoPaso = pasoActual + direccion;
   if (nuevoPaso < 1 || nuevoPaso > 3) return;
 
-  if (pasoActual === 1 && direccion === 1) {
-    const ci = document.getElementById('comprador_ci').value.trim();
-    const nombres = document.getElementById('comprador_nombres').value.trim();
-    const paterno = document.getElementById('comprador_paterno').value.trim();
-
-    if (!ci || !nombres || !paterno) {
-      Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Complete el C.I., nombres y apellido paterno del comprador.' });
-      return;
-    }
-
-    if (!turnoSeleccionado) {
-      const precio = parseFloat(document.getElementById('inputPrecioManual').value) || 0;
-      if (precio <= 0) {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Indique el precio unitario para la venta en espera.' });
-        return;
-      }
-    }
-  }
-
-  if (pasoActual === 2 && direccion === 1) {
-    if (turnoSeleccionado && obtenerAsientosSeleccionados().length === 0) {
-      Swal.fire({ icon: 'warning', title: 'Sin Asientos', text: 'Debe seleccionar al menos un asiento disponible.' });
-      return;
-    }
-  }
+  if (direccion === 1 && !validarPaso(pasoActual)) return;
 
   irAlPasoDirecto(nuevoPaso);
+}
+
+// Salto desde el stepper: hacia adelante se valida cada paso intermedio.
+function irAlPaso(destino) {
+  if (destino <= pasoActual) {
+    irAlPasoDirecto(destino);
+    return;
+  }
+  while (pasoActual < destino) {
+    if (!validarPaso(pasoActual)) return;
+    irAlPasoDirecto(pasoActual + 1);
+  }
 }
 
 function irAlPasoDirecto(paso) {
@@ -836,7 +1029,6 @@ function irAlPasoDirecto(paso) {
   pasoActual = paso;
   document.getElementById(`step-${pasoActual}`).classList.remove('d-none');
 
-  const btnAnt = document.querySelector(`#indicator-step-${pasoActual} button`);
   document.querySelectorAll('.step-indicator button').forEach(b => {
     b.classList.remove('bg-gradient-success', 'text-white');
     b.classList.add('bg-gray-200', 'text-secondary');
@@ -854,18 +1046,8 @@ function irAlPasoDirecto(paso) {
   document.getElementById('btnNext').classList.toggle('d-none', pasoActual === 3);
   document.getElementById('btnSave').classList.toggle('d-none', pasoActual !== 3);
 
-  if (pasoActual === 2) {
-    const panelAsientos = document.getElementById('panelAsientos');
-    const panelResumenEspera = document.getElementById('panelResumenEspera');
-    if (turnoSeleccionado) {
-      panelAsientos.classList.remove('d-none');
-      panelResumenEspera.classList.add('d-none');
-      cargarAsientosTurno();
-    } else {
-      panelAsientos.classList.add('d-none');
-      panelResumenEspera.classList.remove('d-none');
-      recalcularTotalEnEspera();
-    }
+  if (pasoActual === 2 && turnoSeleccionado) {
+    cargarAsientosTurno();
   }
 
   if (pasoActual === 3) {
@@ -875,32 +1057,25 @@ function irAlPasoDirecto(paso) {
 }
 
 function previsualizarBoleto() {
-  const nombres = document.getElementById('comprador_nombres').value.trim();
-  const paterno = document.getElementById('comprador_paterno').value.trim();
-  const ci = document.getElementById('comprador_ci').value.trim();
-  const celular = document.getElementById('comprador_celular').value.trim();
+  const comp = datosComprador();
 
-  document.getElementById('resComprador').textContent = `${nombres} ${paterno}`.trim();
-  document.getElementById('resCi').textContent = ci || '-';
-  document.getElementById('resCelular').textContent = celular || '-';
+  document.getElementById('resComprador').textContent = nombreCompleto(comp);
+  document.getElementById('resCi').textContent = comp.ci || '-';
+  document.getElementById('resCelular').textContent = comp.celular || '-';
 
   const total = calcularTotalVenta();
   document.getElementById('lblTotalFinal').textContent = 'Bs. ' + total.toFixed(2);
   document.getElementById('resTotal').textContent = 'Bs. ' + total.toFixed(2);
 
   if (turnoSeleccionado) {
-    const nAsientos = obtenerAsientosSeleccionados().length;
     document.getElementById('resRuta').textContent = `Trinidad ➔ ${turnoSeleccionado.destino} — ${turnoSeleccionado.vehiculo} — ${turnoSeleccionado.chofer}`;
-    document.getElementById('resAsientos').textContent = `${nAsientos} asiento(s) reservado(s)`;
-    document.getElementById('badgeEstadoVenta').textContent = 'Asignado';
-    document.getElementById('badgeEstadoVenta').className = 'badge bg-gradient-success text-xxs';
-  } else {
-    const cant = Math.max(1, parseInt(document.getElementById('inputCantidadPasajes').value) || 1);
-    document.getElementById('resRuta').textContent = 'Sin turno asignado (en espera de chofer y vehículo)';
-    document.getElementById('resAsientos').textContent = `${cant} pasaje(s) en espera`;
-    document.getElementById('badgeEstadoVenta').textContent = 'Pendiente';
-    document.getElementById('badgeEstadoVenta').className = 'badge bg-gradient-warning text-xxs';
   }
+
+  const lista = Array.from(asientosSeleccionados.values()).map(a => {
+    const p = a.usar_comprador ? comp : a;
+    return `<div>Asiento ${escaparHtmlAsientos(a.etiqueta)} — ${escaparHtmlAsientos(nombreCompleto(p))} <span class="text-secondary font-weight-normal">(C.I. ${escaparHtmlAsientos(p.ci)})</span></div>`;
+  }).join('');
+  document.getElementById('resAsientos').innerHTML = lista || '-';
 }
 
 function actualizarMetodoPago(idMetodo) {
@@ -911,25 +1086,23 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnSave = document.getElementById('btnSave');
   if (btnSave) {
     btnSave.addEventListener('click', function() {
+      if (!turnoSeleccionado || asientosSeleccionados.size === 0) {
+        Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Seleccione un turno y al menos un asiento.' });
+        return;
+      }
+
       btnSave.disabled = true;
 
       const formData = new FormData();
-      formData.append('comprador_ci', document.getElementById('comprador_ci').value.trim());
-      formData.append('comprador_nombres', document.getElementById('comprador_nombres').value.trim());
-      formData.append('comprador_paterno', document.getElementById('comprador_paterno').value.trim());
-      formData.append('comprador_materno', document.getElementById('comprador_materno').value.trim());
-      formData.append('comprador_celular', document.getElementById('comprador_celular').value.trim());
-      formData.append('comprador_direccion', document.getElementById('comprador_direccion').value.trim());
+      formData.append('comprador_ci', valorInput('comprador_ci'));
+      formData.append('comprador_nombres', valorInput('comprador_nombres'));
+      formData.append('comprador_paterno', valorInput('comprador_paterno'));
+      formData.append('comprador_materno', valorInput('comprador_materno'));
+      formData.append('comprador_celular', valorInput('comprador_celular'));
+      formData.append('comprador_direccion', valorInput('comprador_direccion'));
       formData.append('metodo_cobro', document.getElementById('selectMetodoPago').value);
-
-      if (turnoSeleccionado) {
-        formData.append('id_turno', turnoSeleccionado.id);
-        formData.append('asientos_json', JSON.stringify(obtenerAsientosSeleccionados()));
-      } else {
-        formData.append('id_turno', '');
-        formData.append('cantidad_pasajes', document.getElementById('inputCantidadPasajes').value);
-        formData.append('precio_manual', document.getElementById('inputPrecioManual').value);
-      }
+      formData.append('id_turno', turnoSeleccionado.id);
+      formData.append('asientos_json', JSON.stringify(payloadAsientos()));
 
       fetch(baseUrl + '/pasajes/guardar', { method: 'POST', body: formData })
         .then(response => response.json())
@@ -942,10 +1115,9 @@ document.addEventListener('DOMContentLoaded', function() {
             Swal.fire('Error al guardar', res.message || 'Error al guardar la venta de pasaje', 'error');
             btnSave.disabled = false;
 
-            // Si el error fue porque un asiento ya se vendió mientras se
-            // llenaba el formulario, se refresca el plano para que el
-            // cajero vea la ocupación real y no reintente el mismo asiento.
-            if (turnoSeleccionado && /vendido/i.test(res.message || '')) {
+            // Si el error fue porque un asiento ya se vendió, se refresca el
+            // plano para que el cajero vea la ocupación real.
+            if (/vendido/i.test(res.message || '')) {
               cargarAsientosTurno();
             }
           }
@@ -957,7 +1129,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
   }
-
-  recalcularTotalEnEspera();
 });
 </script>

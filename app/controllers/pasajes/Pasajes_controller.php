@@ -6,6 +6,17 @@ require_once __DIR__ . '/../../models/elementos/Elementos_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
 
 class Pasajes_controller {
+
+    /**
+     * Venta "en espera" (sin turno). DESACTIVADA por ahora: todavía no existe
+     * la pantalla que toma esos detalles (id_turno NULL) y les asigna turno +
+     * asiento, así que quedarían huérfanos. La rama de código sigue en
+     * guardar(); para reactivarla hay que poner esto en true, volver a mostrar
+     * la opción "Sin turno" en views/dashboard/pasajes/new.php y construir la
+     * asignación posterior (UPDATE de id_turno / id_elemento).
+     */
+    const PERMITIR_VENTA_EN_ESPERA = false;
+
     private $pasajesModel;
     private $personasModel;
     private $despachosModel;
@@ -20,12 +31,16 @@ class Pasajes_controller {
         $this->metodosPagosModel = new Metodos_pagos_model();
     }
 
+    /**
+     * Listado de VENTAS (una fila por venta). El detalle de asientos/pasajeros
+     * se ve en el modal (acción detalle()).
+     */
     public function index() {
         $viewPath = __DIR__ . '/../../views/dashboard/';
         $menuActivo = 'pasajes';
         $id_sucursal_actual = $_SESSION['id_sucursal'] ?? 1;
 
-        $pasajes = $this->pasajesModel->getPasajesPorSucursal($id_sucursal_actual);
+        $ventas = $this->pasajesModel->getVentasPasajesPorSucursal($id_sucursal_actual);
 
         require_once $viewPath . 'layouts/header.php';
         require_once $viewPath . 'layouts/sidebar.php';
@@ -39,11 +54,6 @@ class Pasajes_controller {
         require_once $viewPath . 'layouts/script.php';
     }
 
-    /**
-     * Formulario de venta. Trae los turnos "en turno" de la sucursal actual
-     * (con su chofer y vehículo ya resueltos) para que el cajero elija uno;
-     * si no elige ninguno, guardar() registra el pasaje "en espera".
-     */
     public function new() {
         $viewPath = __DIR__ . '/../../views/dashboard/';
         $menuActivo = 'pasajes';
@@ -66,14 +76,8 @@ class Pasajes_controller {
 
     /**
      * AJAX: dado un turno, responde con sus datos (vehículo, chofer, precio,
-     * capacidad) y el PLANO COMPLETO del vehículo (todos los pisos, con sus
-     * dimensiones, y TODOS los elementos: asientos + especiales como Chofer,
-     * Baño, Escalera, TV, etc.), marcando qué asientos ya están vendidos EN
-     * ESE turno. Con esto el front-end dibuja el plano visual del bus en vez
-     * de listar los asientos en una tabla.
-     *
-     * Se llama al elegir un turno en el paso 1 y al entrar al paso 2 del
-     * wizard (para refrescar la ocupación real).
+     * capacidad) y el PLANO COMPLETO del vehículo (pisos + todos los
+     * elementos), marcando qué asientos ya están vendidos EN ESE turno.
      */
     public function obtenerConfiguracionTurno() {
         if (ob_get_length()) ob_clean();
@@ -94,12 +98,9 @@ class Pasajes_controller {
         $pisos     = $this->elementosModel->getPisosPorModelo($turno['id_modelo']);
         $elementos = $this->elementosModel->getElementosPorModelo($turno['id_modelo'], $id_turno);
 
-        // Rango real (mínimo/máximo) de fila y columna que ocupa cada piso.
-        // IMPORTANTE: no se asume que fila_elemento/columna_elemento empiecen
-        // en 0 -algunos datos se cargaron empezando en 1, como en este caso-,
-        // así que se normalizan restando el mínimo encontrado. Sin esto,
-        // aparecía una fila y una columna en blanco de más (desplazando todo
-        // el plano) cuando los datos venían en base 1.
+        // Rango real (mínimo/máximo) de fila y columna de cada piso. No se
+        // asume que fila/columna empiecen en 0: se normalizan restando el
+        // mínimo para no dejar una fila/columna en blanco de más.
         $rangoPorPiso = [];
         foreach ($elementos as $el) {
             $idPiso = $el['id_piso'];
@@ -130,9 +131,6 @@ class Pasajes_controller {
         unset($el);
 
         if (empty($pisos)) {
-            // No hay fila en `pisos` (o quedó inactiva): se arma un piso
-            // "virtual" por cada id_piso que sí tenga elementos, para no
-            // dejar el plano en blanco.
             $pisos = [];
             foreach ($rangoPorPiso as $idPiso => $r) {
                 $pisos[] = [
@@ -149,10 +147,6 @@ class Pasajes_controller {
                 $necesitaFilas = isset($rangoPorPiso[$idPiso]) ? ($rangoPorPiso[$idPiso]['maxFila'] - $rangoPorPiso[$idPiso]['minFila'] + 1) : 0;
                 $necesitaCols  = isset($rangoPorPiso[$idPiso]) ? ($rangoPorPiso[$idPiso]['maxCol']  - $rangoPorPiso[$idPiso]['minCol']  + 1) : 0;
 
-                // Siempre el mayor entre lo declarado en `pisos` y lo que
-                // realmente ocupan los elementos: así nunca se recorta el
-                // plano, aunque el registro de `pisos` haya quedado
-                // desactualizado frente a la cantidad real de asientos.
                 $piso['filas_piso']    = max(intval($piso['filas_piso']), $necesitaFilas, 1);
                 $piso['columnas_piso'] = max(intval($piso['columnas_piso']), $necesitaCols, 1);
             }
@@ -169,22 +163,102 @@ class Pasajes_controller {
     }
 
     /**
-     * Registra la venta. Dos modalidades según si llega id_turno o no:
-     *   - CON turno: se exige al menos un asiento (asientos_json) y el precio
-     *     se toma del turno (precio_pasaje_turno); el pasaje queda "Asignado".
-     *   - SIN turno (en espera): se piden cantidad_pasajes y precio_manual;
-     *     el pasaje queda "Pendiente" de que se le asigne chofer/vehículo.
+     * Busca una persona por C.I. y, si no existe, la registra. Lanza
+     * Exception (mensaje legible) si faltan datos obligatorios.
+     */
+    private function resolverPersona($ci, $nombres, $paterno, $materno, $celular, $direccion, $etiqueta) {
+        $ci = trim((string)$ci);
+        if ($ci === '') {
+            throw new Exception("El C.I. del {$etiqueta} es obligatorio");
+        }
+
+        $existente = $this->personasModel->buscarPorCi($ci);
+        if ($existente) {
+            return $existente['id_persona'];
+        }
+
+        $nombres = trim((string)$nombres);
+        $paterno = trim((string)$paterno);
+        if ($nombres === '' || $paterno === '') {
+            throw new Exception("Nombres y apellido paterno del {$etiqueta} son obligatorios");
+        }
+
+        return $this->personasModel->insertarPersona(
+            $ci,
+            $nombres,
+            $paterno,
+            trim((string)$materno),
+            trim((string)$celular),
+            trim((string)$direccion)
+        );
+    }
+
+    /**
+     * Convierte asientos_json en una lista [id_elemento, id_persona_pasajero].
+     * Cada asiento llega como objeto:
+     *   {"id_elemento":12,"usar_comprador":true}
+     *   {"id_elemento":15,"usar_comprador":false,"ci":"..","nombres":"..","paterno":"..","materno":"","celular":".."}
+     * Si usar_comprador es true (o no viene), el pasajero es el comprador; si
+     * no, se busca/registra a esa otra persona. También acepta el formato
+     * antiguo (ids sueltos) por compatibilidad.
+     */
+    private function normalizarAsientos($asientos, $id_comprador) {
+        if (empty($asientos) || !is_array($asientos)) {
+            throw new Exception('Debe seleccionar al menos un asiento del turno.');
+        }
+
+        $vistos = [];
+        $resultado = [];
+
+        foreach ($asientos as $a) {
+            if (!is_array($a)) {
+                $a = ['id_elemento' => $a, 'usar_comprador' => true];
+            }
+
+            $idElemento = intval($a['id_elemento'] ?? 0);
+            if ($idElemento <= 0) {
+                throw new Exception('Se recibió un asiento inválido.');
+            }
+            if (isset($vistos[$idElemento])) {
+                throw new Exception('Un mismo asiento fue seleccionado más de una vez.');
+            }
+            $vistos[$idElemento] = true;
+
+            $usarComprador = !array_key_exists('usar_comprador', $a) || !empty($a['usar_comprador']);
+            if ($usarComprador) {
+                $idPasajero = $id_comprador;
+            } else {
+                $idPasajero = $this->resolverPersona(
+                    $a['ci'] ?? '',
+                    $a['nombres'] ?? '',
+                    $a['paterno'] ?? '',
+                    $a['materno'] ?? '',
+                    $a['celular'] ?? '',
+                    '',
+                    'pasajero del asiento'
+                );
+            }
+
+            $resultado[] = ['id_elemento' => $idElemento, 'id_persona_pasajero' => $idPasajero];
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Registra la venta. TODO ocurre en una sola transacción (incluido el
+     * alta de comprador y pasajeros nuevos): si algo falla, no queda nada a
+     * medias.
      *
-     * IMPORTANTE (columnas nullable): la venta "en espera" guarda
-     * detalles_pasajes con id_turno / id_elemento en NULL. Si tu base de
-     * datos todavía no tiene esas columnas como NULL (el modelo original las
-     * trae NOT NULL), aplica la migración
-     * database/migrations/002_detalles_pasajes_turno_opcional.sql antes de
-     * usar esta opción, o esa rama fallará con un error de integridad.
+     * pasajes.id_persona_comprador     = quien paga.
+     * detalles_pasajes.id_persona_pasajero = quien viaja en cada asiento
+     *                                        (por defecto el comprador).
      */
     public function guardar() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
+
+        global $pdo;
 
         try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -192,140 +266,92 @@ class Pasajes_controller {
                 exit;
             }
 
-            $id_usuario = $_SESSION['id_usuario'] ?? 1;
+            $id_usuario     = $_SESSION['id_usuario'] ?? 1;
             $id_metodo_pago = intval($_POST['metodo_cobro'] ?? 1);
+            $id_turno       = !empty($_POST['id_turno']) ? intval($_POST['id_turno']) : null;
 
-            // Comprador / pasajero
-            $ciComprador = trim($_POST['comprador_ci'] ?? '');
-            if (empty($ciComprador)) {
-                echo json_encode(['success' => false, 'message' => 'El C.I. del comprador es obligatorio']);
-                exit;
+            if (!$id_turno && !self::PERMITIR_VENTA_EN_ESPERA) {
+                throw new Exception('Debe seleccionar un turno para emitir el boleto.');
             }
 
-            $personaComprador = $this->personasModel->buscarPorCi($ciComprador);
-            if ($personaComprador) {
-                $id_comprador = $personaComprador['id_persona'];
-            } else {
-                $nombresComprador = trim($_POST['comprador_nombres'] ?? '');
-                $paternoComprador = trim($_POST['comprador_paterno'] ?? '');
-                if (empty($nombresComprador) || empty($paternoComprador)) {
-                    echo json_encode(['success' => false, 'message' => 'Nombres y apellido paterno del comprador son obligatorios']);
-                    exit;
-                }
-                $id_comprador = $this->personasModel->insertarPersona(
-                    $ciComprador,
-                    $nombresComprador,
-                    $paternoComprador,
-                    trim($_POST['comprador_materno'] ?? ''),
-                    trim($_POST['comprador_celular'] ?? ''),
-                    trim($_POST['comprador_direccion'] ?? '')
-                );
-            }
-
-            $id_turno = !empty($_POST['id_turno']) ? intval($_POST['id_turno']) : null;
-
-            global $pdo;
             $pdo->beginTransaction();
-            $resPasaje = null;
-            $idPasaje  = null;
 
-            try {
-                if ($id_turno) {
-                    // --- Venta CON turno: uno o varios asientos concretos ---
-                    $turnoInfo = $this->despachosModel->obtenerTurnoConVehiculo($id_turno);
-                    if (!$turnoInfo) {
-                        throw new Exception('El turno seleccionado ya no está disponible.');
-                    }
+            $id_comprador = $this->resolverPersona(
+                $_POST['comprador_ci'] ?? '',
+                $_POST['comprador_nombres'] ?? '',
+                $_POST['comprador_paterno'] ?? '',
+                $_POST['comprador_materno'] ?? '',
+                $_POST['comprador_celular'] ?? '',
+                $_POST['comprador_direccion'] ?? '',
+                'comprador'
+            );
 
-                    $asientos = json_decode($_POST['asientos_json'] ?? '[]', true);
-                    if (empty($asientos) || !is_array($asientos)) {
-                        throw new Exception('Debe seleccionar al menos un asiento del turno.');
-                    }
+            if ($id_turno) {
+                // --- Venta CON turno: uno o varios asientos concretos ---
+                $turnoInfo = $this->despachosModel->obtenerTurnoConVehiculo($id_turno);
+                if (!$turnoInfo) {
+                    throw new Exception('El turno seleccionado ya no está disponible.');
+                }
 
-                    $precioUnitario = floatval($turnoInfo['precio_pasaje_turno']);
-                    $totalPasaje    = $precioUnitario * count($asientos);
-                    $idEstado       = $this->pasajesModel->obtenerIdEstadoAsignado();
+                $pasajeros = $this->normalizarAsientos(
+                    json_decode($_POST['asientos_json'] ?? '[]', true),
+                    $id_comprador
+                );
 
-                    $resPasaje = $this->pasajesModel->insertarPasaje([
-                        'id_persona_comprador' => $id_comprador,
-                        'id_usuario'           => $id_usuario,
-                        'id_metodo_pago'       => $id_metodo_pago,
-                        'total_pasaje'         => $totalPasaje
+                $precioUnitario = floatval($turnoInfo['precio_pasaje_turno']);
+                $totalPasaje    = $precioUnitario * count($pasajeros);
+                $idEstado       = $this->pasajesModel->obtenerIdEstadoAsignado();
+
+                $resPasaje = $this->pasajesModel->insertarPasaje([
+                    'id_persona_comprador' => $id_comprador,
+                    'id_usuario'           => $id_usuario,
+                    'id_metodo_pago'       => $id_metodo_pago,
+                    'total_pasaje'         => $totalPasaje
+                ]);
+                $idPasaje = $resPasaje['id_pasaje'];
+
+                foreach ($pasajeros as $p) {
+                    $this->pasajesModel->insertarDetallePasaje([
+                        'id_pasaje'             => $idPasaje,
+                        'id_turno'              => $id_turno,
+                        'id_persona_pasajero'   => $p['id_persona_pasajero'],
+                        'id_elemento'           => $p['id_elemento'],
+                        'precio_detalle_pasaje' => $precioUnitario,
+                        'id_estado_pasaje'      => $idEstado
                     ]);
-                    $idPasaje = $resPasaje['id_pasaje'];
+                }
+            } else {
+                // --- Venta SIN turno ("en espera"): solo si PERMITIR_VENTA_EN_ESPERA ---
+                $cantidad = max(1, intval($_POST['cantidad_pasajes'] ?? 1));
+                $precioUnitario = floatval($_POST['precio_manual'] ?? 0);
+                if ($precioUnitario <= 0) {
+                    throw new Exception('Indique el precio del pasaje para la venta en espera.');
+                }
 
-                    foreach ($asientos as $idElemento) {
-                        $this->pasajesModel->insertarDetallePasaje([
-                            'id_pasaje'             => $idPasaje,
-                            'id_turno'              => $id_turno,
-                            'id_persona_pasajero'   => $id_comprador,
-                            'id_elemento'           => intval($idElemento),
-                            'precio_detalle_pasaje' => $precioUnitario,
-                            'id_estado_pasaje'      => $idEstado
-                        ]);
-                    }
-                } else {
-                    // --- Venta SIN turno: queda "en espera" de asignación ---
-                    $cantidad = max(1, intval($_POST['cantidad_pasajes'] ?? 1));
-                    $precioUnitario = floatval($_POST['precio_manual'] ?? 0);
-                    if ($precioUnitario <= 0) {
-                        throw new Exception('Indique el precio del pasaje para la venta en espera.');
-                    }
+                $totalPasaje = $precioUnitario * $cantidad;
+                $idEstado    = $this->pasajesModel->obtenerIdEstadoPendiente();
 
-                    $totalPasaje = $precioUnitario * $cantidad;
-                    $idEstado    = $this->pasajesModel->obtenerIdEstadoPendiente();
+                $resPasaje = $this->pasajesModel->insertarPasaje([
+                    'id_persona_comprador' => $id_comprador,
+                    'id_usuario'           => $id_usuario,
+                    'id_metodo_pago'       => $id_metodo_pago,
+                    'total_pasaje'         => $totalPasaje
+                ]);
+                $idPasaje = $resPasaje['id_pasaje'];
 
-                    $resPasaje = $this->pasajesModel->insertarPasaje([
-                        'id_persona_comprador' => $id_comprador,
-                        'id_usuario'           => $id_usuario,
-                        'id_metodo_pago'       => $id_metodo_pago,
-                        'total_pasaje'         => $totalPasaje
+                for ($i = 0; $i < $cantidad; $i++) {
+                    $this->pasajesModel->insertarDetallePasaje([
+                        'id_pasaje'             => $idPasaje,
+                        'id_turno'              => null,
+                        'id_persona_pasajero'   => $id_comprador,
+                        'id_elemento'           => null,
+                        'precio_detalle_pasaje' => $precioUnitario,
+                        'id_estado_pasaje'      => $idEstado
                     ]);
-                    $idPasaje = $resPasaje['id_pasaje'];
-
-                    for ($i = 0; $i < $cantidad; $i++) {
-                        $this->pasajesModel->insertarDetallePasaje([
-                            'id_pasaje'             => $idPasaje,
-                            'id_turno'              => null,
-                            'id_persona_pasajero'   => $id_comprador,
-                            'id_elemento'           => null,
-                            'precio_detalle_pasaje' => $precioUnitario,
-                            'id_estado_pasaje'      => $idEstado
-                        ]);
-                    }
                 }
-
-                $pdo->commit();
-            } catch (PDOException $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-
-                // MUY IMPORTANTE: antes se asumía que CUALQUIER error de
-                // integridad (SQLSTATE clase 23000) era "el asiento ya fue
-                // vendido", pero esa clase también cubre violaciones de
-                // NOT NULL y de llave foránea (por ejemplo id_estado_pasaje
-                // o id_turno/id_elemento apuntando a un registro que no
-                // existe, o columnas que en tu base todavía son NOT NULL).
-                // Eso ocultaba el error real y confundía, porque el mensaje
-                // decía "ya fue vendido" sin serlo. Ahora se distingue el
-                // código NATIVO de MySQL (1062 = duplicado real) del resto.
-                $codigoMysql = $e->errorInfo[1] ?? null;
-
-                if ($codigoMysql == 1062) {
-                    throw new Exception('Uno de los asientos seleccionados ya fue vendido. Actualice la lista e intente nuevamente.');
-                }
-
-                // Para cualquier otro error de base de datos, se muestra el
-                // motivo real (mensaje de MySQL) para poder diagnosticarlo,
-                // en vez de una excusa genérica que no corresponde.
-                throw new Exception('No se pudo registrar la venta (' . $e->getMessage() . ')');
-            } catch (Exception $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                throw $e;
             }
+
+            $pdo->commit();
 
             Flash::set(
                 true,
@@ -340,7 +366,28 @@ class Pasajes_controller {
             ]);
             exit;
 
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            // 1062 = duplicado real (UK_turno_asiento). Otros errores de la
+            // clase 23000 (NOT NULL, llave foránea) NO significan "asiento
+            // vendido", así que se muestra el motivo real.
+            $codigoMysql = $e->errorInfo[1] ?? null;
+            if ($codigoMysql == 1062) {
+                $mensaje = 'Uno de los asientos seleccionados ya fue vendido. Actualice la lista e intente nuevamente.';
+            } else {
+                $mensaje = 'No se pudo registrar la venta (' . $e->getMessage() . ')';
+            }
+
+            echo json_encode(['success' => false, 'message' => $mensaje]);
+            exit;
+
         } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             exit;
         }
@@ -348,7 +395,7 @@ class Pasajes_controller {
 
     /**
      * Imprime el boleto completo (todos los asientos de una misma venta).
-     * $id es pasajes.id_pasaje (la cabecera), no un detalle individual.
+     * $id es pasajes.id_pasaje (la cabecera).
      */
     public function imprimir() {
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -368,8 +415,8 @@ class Pasajes_controller {
     }
 
     /**
-     * Detalle en JSON (cabecera + todos los asientos) para el modal de
-     * "Ver Detalle". $id es pasajes.id_pasaje.
+     * Detalle en JSON (cabecera + todos los asientos con su pasajero) para el
+     * modal "Ver Detalle". $id es pasajes.id_pasaje.
      */
     public function detalle() {
         if (ob_get_length()) ob_clean();
@@ -394,30 +441,60 @@ class Pasajes_controller {
     }
 
     /**
-     * Anula un asiento/boleto puntual (id_detalle_pasaje), sin tocar los
-     * demás asientos de la misma venta.
+     * Anula la VENTA COMPLETA (POST id_pasaje): todos sus boletos.
      */
     public function anular() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
 
         try {
-            $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+                exit;
+            }
 
+            $id = intval($_POST['id_pasaje'] ?? 0);
             if ($id <= 0) {
                 echo json_encode(['success' => false, 'message' => 'Identificador inválido.']);
                 exit;
             }
 
-            if ($this->pasajesModel->anularPasaje($id)) {
-                Flash::set(true, 'El pasaje ha sido anulado correctamente.', 'Anulación Exitosa');
-                echo json_encode(['success' => true]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'No se pudo anular el pasaje.']);
-            }
+            $this->pasajesModel->anularVenta($id);
+            Flash::set(true, 'La venta ha sido anulada correctamente.', 'Anulación Exitosa');
+            echo json_encode(['success' => true]);
             exit;
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error en el servidor: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    /**
+     * Anula UN boleto/asiento (POST id_detalle_pasaje) sin tocar los demás
+     * asientos de la misma venta.
+     */
+    public function anularDetalle() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+
+        try {
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+                exit;
+            }
+
+            $id = intval($_POST['id_detalle_pasaje'] ?? 0);
+            if ($id <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Identificador inválido.']);
+                exit;
+            }
+
+            $this->pasajesModel->anularDetalle($id);
+            Flash::set(true, 'El boleto ha sido anulado correctamente.', 'Anulación Exitosa');
+            echo json_encode(['success' => true]);
+            exit;
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             exit;
         }
     }
