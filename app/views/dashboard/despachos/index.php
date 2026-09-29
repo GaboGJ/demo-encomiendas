@@ -96,7 +96,7 @@
                         <div class="d-flex align-items-center justify-content-end gap-1">
                           <?php if ($esEnTurno): ?>
                             <!-- Botón de asignación visible si está En Turno -->
-                            <a href="<?= URL ?>despachos/asignar?id=<?= $d['id_turno'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Asignar Pasajes y Encomiendas">
+                            <a href="<?= URL ?>/despachos/asign?id=<?= $d['id_turno'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Asignar Pasajes y Encomiendas">
                               <i class="material-symbols-rounded text-sm">assignment</i>
                             </a>
                           <?php endif; ?>
