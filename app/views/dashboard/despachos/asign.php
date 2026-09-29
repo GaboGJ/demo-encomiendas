@@ -18,7 +18,27 @@ $pasos = [
     2 => ['inventory_2', 'Pasajes y Encomiendas'],
     3 => ['print',       'Manifiesto'],
 ];
+
+// Encomiendas: solo lo PAGADO en origen cuenta como cobrado. Las COD se
+// cobran en destino, así que se muestran aparte y no se suman al total cobrado.
+$encPagadas     = array_filter($encAsignadas, function ($e) { return !empty($e['pagado']); });
+$encCod         = array_filter($encAsignadas, function ($e) { return empty($e['pagado']); });
+$montoEncPagado = array_sum(array_column($encPagadas, 'monto_encomienda'));
+$montoEncCod    = array_sum(array_column($encCod, 'monto_encomienda'));
+
+// Clases comunes de cabecera/celda: iguales que en el resto de tablas del sistema
+// para que el control "+" de DataTables Responsive se vea idéntico en todas.
+$thBase  = 'text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 border-top border-bottom border-light';
+$thFirst = $thBase . ' ps-4 ps-md-5 pe-3';
 ?>
+<style>
+  /* Modal de guías: aprovechar el ancho disponible en pantallas chicas */
+  @media (max-width: 575.98px) {
+    #modalAsignarEncomiendas .modal-dialog { max-width: calc(100% - 1rem); margin: .5rem auto; }
+  }
+  #modalAsignarEncomiendas .btn-sel { white-space: nowrap; min-width: 92px; }
+</style>
+
 <div class="container-fluid py-2 py-md-3 flex-grow-1">
   <div class="row">
     <div class="col-12 col-xl-11 mx-auto px-1 px-sm-2 px-md-3">
@@ -154,22 +174,22 @@ $pasos = [
                   </div>
 
                   <div class="table-responsive p-0">
-                    <table class="table align-items-center mb-0 w-100" id="tablaPasajesTurno">
+                    <table class="table table-borderless align-items-center mb-0 w-100" id="tablaPasajesTurno">
                       <thead>
                         <tr>
-                          <th data-priority="1" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Asiento</th>
-                          <th data-priority="2" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Pasajero</th>
-                          <th data-priority="4" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Venta</th>
-                          <th data-priority="3" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Monto</th>
+                          <th data-priority="1" class="<?= $thFirst ?>">Asiento</th>
+                          <th data-priority="2" class="<?= $thBase ?> px-3">Pasajero</th>
+                          <th data-priority="4" class="<?= $thBase ?> px-3">Venta</th>
+                          <th data-priority="3" class="<?= $thBase ?> text-end pe-4">Monto</th>
                         </tr>
                       </thead>
                       <tbody>
                         <?php foreach ($pasajeros as $p): ?>
                           <tr>
-                            <td class="ps-2"><span class="badge bg-gradient-success">Asiento <?= $h($p['asiento'] ?? 'S/A') ?></span></td>
-                            <td class="text-xs font-weight-bold text-dark"><?= $h($p['pasajero']) ?><span class="d-block text-xxs text-secondary">C.I. <?= $h($p['pasajero_ci']) ?></span></td>
-                            <td class="text-xs text-secondary">#<?= $h($p['codigo_pasaje']) ?></td>
-                            <td class="text-end text-xs font-weight-bold text-dark pe-3">Bs. <?= number_format($p['precio_detalle_pasaje'], 2) ?></td>
+                            <td class="py-3 ps-4 text-xs"><span class="badge bg-gradient-success">Asiento <?= $h($p['asiento'] ?? 'S/A') ?></span></td>
+                            <td class="py-3 px-3 text-xs font-weight-bold text-dark"><?= $h($p['pasajero']) ?><span class="d-block text-xxs text-secondary">C.I. <?= $h($p['pasajero_ci']) ?></span></td>
+                            <td class="py-3 px-3 text-xs text-secondary">#<?= $h($p['codigo_pasaje']) ?></td>
+                            <td class="py-3 pe-4 text-end text-xs font-weight-bold text-dark">Bs. <?= number_format($p['precio_detalle_pasaje'], 2) ?></td>
                           </tr>
                         <?php endforeach; ?>
                       </tbody>
@@ -187,7 +207,7 @@ $pasos = [
                         <i class="material-symbols-rounded me-1 align-middle text-sm">inventory_2</i> Encomiendas asignadas
                       </h6>
                       <p class="text-xxs text-secondary mb-0">
-                        <?= $resumen['guias'] ?> guía(s) · Bs. <?= number_format($resumen['monto_encomiendas'], 2) ?> · <?= count($encPendientes) ?> pendiente(s) hacia <?= $h($turno['ciudad_destino']) ?>
+                        <?= $resumen['guias'] ?> guía(s) · Pagadas: Bs. <?= number_format($montoEncPagado, 2) ?> · COD: Bs. <?= number_format($montoEncCod, 2) ?> · <?= count($encPendientes) ?> pendiente(s) hacia <?= $h($turno['ciudad_destino']) ?>
                       </p>
                     </div>
                     <button type="button" class="btn btn-sm bg-gradient-success mb-0 border-radius-md py-2 px-3 text-capitalize shadow-sm w-100 w-sm-auto" data-bs-toggle="modal" data-bs-target="#modalAsignarEncomiendas">
@@ -196,35 +216,40 @@ $pasos = [
                   </div>
 
                   <div class="table-responsive p-0">
-                    <table class="table align-items-center mb-0 w-100" id="tablaEncomiendasTurno">
-                      <thead>
-                        <tr>
-                          <th data-priority="1" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Guía</th>
-                          <th data-priority="3" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Remitente ➔ Destinatario</th>
-                          <th data-priority="5" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Bultos / Peso</th>
-                          <th data-priority="4" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Cobro</th>
-                          <th data-priority="2" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Flete</th>
-                          <th data-priority="1" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <?php foreach ($encAsignadas as $e): ?>
-                          <tr>
-                            <td class="ps-2 text-xs font-weight-bold text-dark">#<?= $h($e['guia_encomienda']) ?></td>
-                            <td class="text-xs text-dark"><?= $h($e['remitente']) ?> ➔ <?= $h($e['destinatario']) ?>
-                              <?php if (!empty($e['declaracion_encomienda'])): ?><span class="d-block text-xxs text-secondary"><?= $h($e['declaracion_encomienda']) ?></span><?php endif; ?></td>
-                            <td class="text-center text-xs"><?= (int)$e['total_bultos'] ?> bulto(s)<span class="d-block text-xxs text-secondary"><?= $e['peso_total'] > 0 ? number_format($e['peso_total'], 1) . ' Kg' : 'Sin peso' ?></span></td>
-                            <td class="text-center"><span class="badge badge-sm <?= $e['pagado'] ? 'bg-gradient-success' : 'bg-gradient-warning' ?>"><?= $e['pagado'] ? 'Pagado' : 'COD' ?></span></td>
-                            <td class="text-end text-xs font-weight-bold text-dark">Bs. <?= number_format($e['monto_encomienda'], 2) ?></td>
-                            <td class="text-end pe-3">
-                              <button type="button" class="btn btn-link text-danger p-1 m-0" title="Quitar del turno" onclick="quitarEncomienda(<?= (int)$e['id_encomienda'] ?>, '<?= $h($e['guia_encomienda']) ?>')">
-                                <i class="material-symbols-rounded text-sm">remove_circle</i>
-                              </button>
-                            </td>
-                          </tr>
-                        <?php endforeach; ?>
-                      </tbody>
-                    </table>
+                  <table class="table table-borderless align-items-center mb-0 w-100" id="tablaEncomiendasTurno">
+  <thead>
+    <tr>
+      <th data-priority="1" class="<?= $thFirst ?>">Guía</th>
+      <th data-priority="3" class="<?= $thBase ?> px-3">Remitente ➔ Destinatario</th>
+      <th data-priority="2" class="<?= $thBase ?> px-3 text-end">Cobro</th>
+      <th data-priority="1" class="<?= $thBase ?> text-end pe-4">Acción</th>
+    </tr>
+  </thead>
+  <tbody>
+    <?php foreach ($encAsignadas as $e): ?>
+      <tr>
+        <td class="py-3 ps-4 ps-md-5 pe-3 text-xs font-weight-bold text-dark">#<?= $h($e['guia_encomienda']) ?></td>
+        <td class="py-3 px-3 text-xs text-dark">
+          <?= $h($e['remitente']) ?> ➔ <?= $h($e['destinatario']) ?>
+          <?php if (!empty($e['declaracion_encomienda'])): ?>
+            <span class="d-block text-xxs text-secondary"><?= $h($e['declaracion_encomienda']) ?></span>
+          <?php endif; ?>
+        </td>
+        <td class="py-3 px-3 text-end text-xs font-weight-bold text-nowrap">
+          Bs. <?= number_format($e['monto_encomienda'], 2) ?> 
+          <span class="badge badge-sm <?= $e['pagado'] ? 'bg-gradient-success' : 'bg-gradient-warning' ?>">
+            <?= $e['pagado'] ? 'Pagado' : 'COD' ?>
+          </span>
+        </td>
+        <td class="py-3 pe-4 text-end">
+          <button type="button" class="btn btn-link text-danger p-1 m-0" title="Quitar del turno" onclick="quitarEncomienda(<?= (int)$e['id_encomienda'] ?>, '<?= $h($e['guia_encomienda']) ?>')">
+            <i class="material-symbols-rounded text-sm">remove_circle</i>
+          </button>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+  </tbody>
+</table>
                   </div>
                 </div>
               </div>
@@ -279,8 +304,9 @@ $pasos = [
                 <div class="col-12 col-sm-6">
                   <div class="p-2 border border-radius-md h-100">
                     <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block mb-1">Encomiendas</span>
-                    <p class="text-xs font-weight-bold text-dark mb-0"><?= $resumen['guias'] ?> guía(s) consolidadas</p>
-                    <p class="text-xxs text-success font-weight-bold mb-0">Fletes: Bs. <?= number_format($resumen['monto_encomiendas'], 2) ?></p>
+                    <p class="text-xs font-weight-bold text-dark mb-1"><?= $resumen['guias'] ?> guía(s) consolidadas</p>
+                    <p class="text-xxs text-success font-weight-bold mb-0">Cobrado en origen: Bs. <?= number_format($montoEncPagado, 2) ?> (<?= count($encPagadas) ?> guía(s))</p>
+                    <p class="text-xxs text-warning font-weight-bold mb-0">Por cobrar en destino (COD): Bs. <?= number_format($montoEncCod, 2) ?> (<?= count($encCod) ?> guía(s))</p>
                   </div>
                 </div>
               </div>
@@ -317,54 +343,80 @@ $pasos = [
 
 <!-- MODAL: AGREGAR GUÍAS PENDIENTES (con DataTables) -->
 <div class="modal fade" id="modalAsignarEncomiendas" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-fullscreen-sm-down modal-dialog-centered modal-dialog-scrollable">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content border-radius-xl">
-      <div class="modal-header bg-gradient-success text-white">
-        <h5 class="modal-title text-white font-weight-bold fs-6 fs-md-5">
-          <i class="material-symbols-rounded me-1 align-middle">inventory_2</i> Guías pendientes hacia <?= $h($turno['ciudad_destino']) ?>
+      
+      <!-- HEADER -->
+      <div class="modal-header bg-gradient-success text-white p-3">
+        <h5 class="modal-title text-white font-weight-bold fs-6 fs-md-5 d-flex align-items-center mb-0">
+          <i class="material-symbols-rounded me-2">inventory_2</i>
+          <span class="text-truncate">Guías pendientes hacia <?= $h($turno['ciudad_destino']) ?></span>
         </h5>
-        <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close text-white ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-2 p-md-3">
-        <div class="d-flex align-items-center gap-2 px-2 pb-2">
-          <div class="form-check mb-0">
-            <input type="checkbox" class="form-check-input" id="chkTodas">
-            <label class="form-check-label text-xs font-weight-bold text-secondary" for="chkTodas">Seleccionar todas las filtradas</label>
-          </div>
+
+      <!-- BODY -->
+      <div class="modal-body p-2 p-sm-3">
+        
+        <!-- BARRA SUPERIOR DE ACCIÓN -->
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3 px-1">
+          <p class="text-xs text-secondary mb-0">Seleccione las encomiendas que desea asignar al turno</p>
+          <button type="button" class="btn btn-sm btn-outline-success border-radius-md mb-0 d-inline-flex align-items-center justify-content-center gap-1 w-100 w-sm-auto" id="btnSelTodas">
+            <i class="material-symbols-rounded text-sm">done_all</i>
+            <span>Seleccionar todas</span>
+          </button>
         </div>
-        <div class="table-responsive">
-          <table class="table align-items-center mb-0 w-100" id="tablaPendientes">
+
+        <!-- TABLA CONTENIDA -->
+        <div class="table-responsive p-0">
+          <table class="table table-borderless align-items-center mb-0 w-100" id="tablaPendientes">
             <thead>
               <tr>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-3">Guía</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Remitente ➔ Destinatario</th>
-                <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Bultos</th>
-                <th class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 pe-3">Flete</th>
+                <th data-priority="1" class="<?= $thFirst ?>">Guía</th>
+                <th data-priority="3" class="<?= $thBase ?> px-2 px-md-3">Remitente ➔ Destinatario</th>
+                <th data-priority="2" class="<?= $thBase ?> px-2 px-md-3 text-end">Cobro</th>
+                <th data-priority="1" class="<?= $thBase ?> text-end pe-3 pe-md-4">Acción</th>
               </tr>
             </thead>
             <tbody>
               <?php foreach ($encPendientes as $e): ?>
                 <tr>
-                  <td class="ps-3 text-xs font-weight-bold text-dark text-nowrap">
-                    <div class="form-check mb-0 d-flex align-items-center gap-2">
-                      <input type="checkbox" class="form-check-input chk-pend mt-0" value="<?= (int)$e['id_encomienda'] ?>" id="chk-<?= (int)$e['id_encomienda'] ?>">
-                      <label class="form-check-label mb-0" for="chk-<?= (int)$e['id_encomienda'] ?>">#<?= $h($e['guia_encomienda']) ?></label>
+                  <td class="py-3 ps-4 ps-md-5 pe-3 text-xs font-weight-bold text-dark">
+                    #<?= $h($e['guia_encomienda']) ?>
+                  </td>
+                  <td class="py-3 px-2 px-md-3 text-xs text-dark">
+                    <div class="d-flex flex-column">
+                      <span class="font-weight-bold text-dark text-wrap"><?= $h($e['remitente']) ?> ➔ <?= $h($e['destinatario']) ?></span>
                     </div>
                   </td>
-                  <td class="text-xs text-dark"><?= $h($e['remitente']) ?> ➔ <?= $h($e['destinatario']) ?></td>
-                  <td class="text-center text-xs"><?= (int)$e['total_bultos'] ?></td>
-                  <td class="text-end text-xs font-weight-bold pe-3 text-nowrap">Bs. <?= number_format($e['monto_encomienda'], 2) ?> <span class="badge badge-sm <?= $e['pagado'] ? 'bg-gradient-success' : 'bg-gradient-warning' ?>"><?= $e['pagado'] ? 'Pagado' : 'COD' ?></span></td>
+                  <td class="py-3 px-2 px-md-3 text-end text-xs font-weight-bold text-nowrap">
+                    <div class="d-flex flex-column align-items-end">
+                      <span>Bs. <?= number_format($e['monto_encomienda'], 2) ?></span>
+                      <span class="badge badge-sm <?= $e['pagado'] ? 'bg-gradient-success' : 'bg-gradient-warning' ?> mt-1">
+                        <?= $e['pagado'] ? 'Pagado' : 'COD' ?>
+                      </span>
+                    </div>
+                  </td>
+                  <td class="py-3 pe-3 pe-md-4 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-success btn-sel mb-0 px-2 py-1 border-radius-md d-inline-flex align-items-center justify-content-center" data-id="<?= (int)$e['id_encomienda'] ?>"></button>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
         </div>
+
       </div>
-      <div class="modal-footer bg-gray-100 flex-wrap gap-2">
-        <span class="text-xs text-secondary me-auto" id="lblSeleccionadas">0 seleccionada(s)</span>
-        <button type="button" class="btn btn-sm bg-gradient-secondary mb-0" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-sm bg-gradient-success mb-0" id="btnAsignarSel" onclick="asignarSeleccionadas()">Asignar al turno</button>
+
+      <!-- FOOTER -->
+      <div class="modal-footer bg-gray-100 p-3 d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2">
+        <span class="text-xs font-weight-bold text-secondary text-center text-sm-start w-100 w-sm-auto" id="lblSeleccionadas">0 seleccionada(s)</span>
+        <div class="d-flex gap-2 w-100 w-sm-auto justify-content-end">
+          <button type="button" class="btn btn-sm bg-gradient-secondary border-radius-md mb-0 w-50 w-sm-auto" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-sm bg-gradient-success border-radius-md mb-0 w-50 w-sm-auto" id="btnAsignarSel" onclick="asignarSeleccionadas()">Asignar al turno</button>
+        </div>
       </div>
+
     </div>
   </div>
 </div>
@@ -379,8 +431,10 @@ $pasos = [
   let pasoActual = 1;
   const tablasInit = {};
   let dtPendientes = null;
+  const seleccion = new Set();
 
-  // Sin filas, DataTables muestra su propio "No hay registros disponibles"
+  // Siempre se usa el helper global inicializarDataTable() para que todas las tablas
+  // (incluido el control "+" de Responsive) se vean igual.
   function iniciarTabla(id, placeholder, extra) {
     if (tablasInit[id] || typeof inicializarDataTable !== 'function') return null;
     const dt = inicializarDataTable('#' + id, Object.assign({ ordering: false, placeholder: placeholder, pageLength: 5 }, extra || {}));
@@ -391,8 +445,9 @@ $pasos = [
   function ajustarTablas() {
     if (window.jQuery && $.fn.DataTable) {
       setTimeout(function () {
-        $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
-        if ($.fn.dataTable.Responsive) $.fn.dataTable.tables({ visible: true, api: true }).responsive.recalc();
+        const tablas = $.fn.dataTable.tables({ visible: true, api: true });
+        tablas.columns.adjust();
+        if ($.fn.dataTable.Responsive) tablas.responsive.recalc();
       }, 60);
     }
   }
@@ -443,35 +498,60 @@ $pasos = [
   }
   function errorServidor() { Swal.fire('Error', 'Ocurrió un error en el servidor', 'error'); }
 
-  /* ---- Modal: selección de guías pendientes (DataTables) ----
-     Con paginación, las filas de otras páginas no están en pantalla, por eso
-     se leen siempre a través de la API de DataTables (dt.$ / dt.rows). */
-  function checksSeleccionados() {
-    return dtPendientes ? dtPendientes.$('.chk-pend:checked') : $('.chk-pend:checked');
+  /* ---- Modal: selección de guías pendientes ----
+     La selección vive en un Set (por id) y cada fila tiene un botón Elegir/Elegida.
+     Con paginación las filas de otras páginas no están en pantalla, por eso los
+     nodos se leen siempre a través de la API de DataTables. */
+  function botonesTodos() {
+    return dtPendientes ? $(dtPendientes.rows().nodes()).find('.btn-sel') : $('#tablaPendientes .btn-sel');
   }
-  function seleccionadas() {
-    return checksSeleccionados().map(function () { return this.value; }).get();
-  }
-  function actualizarContador() {
-    const l = document.getElementById('lblSeleccionadas');
-    if (l) l.textContent = seleccionadas().length + ' seleccionada(s)';
+  function botonesFiltrados() {
+    return dtPendientes ? $(dtPendientes.rows({ search: 'applied' }).nodes()).find('.btn-sel') : $('#tablaPendientes .btn-sel');
   }
 
-  document.addEventListener('change', function (e) {
-    if (e.target.classList.contains('chk-pend')) {
+  function pintarBoton(btn) {
+    const activo = seleccion.has(btn.getAttribute('data-id'));
+    btn.classList.toggle('bg-gradient-success', activo);
+    btn.classList.toggle('text-white', activo);
+    btn.classList.toggle('btn-outline-success', !activo);
+    btn.innerHTML = activo
+      ? '<i class="material-symbols-rounded text-sm me-1">check_circle</i>Elegida'
+      : '<i class="material-symbols-rounded text-sm me-1">add_circle</i>Elegir';
+  }
+
+  function actualizarContador() {
+    const l = document.getElementById('lblSeleccionadas');
+    if (l) l.textContent = seleccion.size + ' seleccionada(s)';
+
+    const filtrados = botonesFiltrados().map(function () { return this.getAttribute('data-id'); }).get();
+    const todas = filtrados.length > 0 && filtrados.every(function (id) { return seleccion.has(id); });
+    const lblTodas = document.querySelector('#btnSelTodas span');
+    if (lblTodas) lblTodas.textContent = todas ? 'Quitar selección' : 'Seleccionar todas';
+  }
+
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-sel');
+    if (btn) {
+      const id = btn.getAttribute('data-id');
+      if (seleccion.has(id)) seleccion.delete(id); else seleccion.add(id);
+      pintarBoton(btn);
       actualizarContador();
+      return;
     }
-    if (e.target.id === 'chkTodas' && dtPendientes) {
-      const marcado = e.target.checked;
-      // Todas las filas que cumplen el filtro actual, incluso de otras páginas
-      $(dtPendientes.rows({ search: 'applied' }).nodes()).find('.chk-pend').prop('checked', marcado);
+
+    if (e.target.closest('#btnSelTodas')) {
+      const btns = botonesFiltrados();
+      const ids = btns.map(function () { return this.getAttribute('data-id'); }).get();
+      const todas = ids.length > 0 && ids.every(function (id) { return seleccion.has(id); });
+      ids.forEach(function (id) { if (todas) seleccion.delete(id); else seleccion.add(id); });
+      btns.each(function () { pintarBoton(this); });
       actualizarContador();
     }
   });
 
   window.asignarSeleccionadas = function () {
-    const ids = seleccionadas();
-    if (!ids.length) { Swal.fire({ icon: 'warning', title: 'Sin selección', text: 'Marque al menos una guía.' }); return; }
+    const ids = Array.from(seleccion);
+    if (!ids.length) { Swal.fire({ icon: 'warning', title: 'Sin selección', text: 'Elija al menos una guía.' }); return; }
     const btn = document.getElementById('btnAsignarSel'); btn.disabled = true;
     post('/despachos/asignarEncomiendas', { id_turno: ID_TURNO, ids_json: JSON.stringify(ids) })
       .then(function (res) {
@@ -512,10 +592,10 @@ $pasos = [
 
   const modalEl = document.getElementById('modalAsignarEncomiendas');
   if (modalEl) {
-    // Al abrir: limpiar selección previa
+    // Al abrir: limpiar selección previa y pintar todos los botones como "Elegir"
     modalEl.addEventListener('show.bs.modal', function () {
-      $('.chk-pend, #chkTodas').prop('checked', false);
-      if (dtPendientes) dtPendientes.$('.chk-pend').prop('checked', false);
+      seleccion.clear();
+      botonesTodos().each(function () { pintarBoton(this); });
       actualizarContador();
     });
     // Ya visible el modal: recién ahora DataTables puede medir bien las columnas
@@ -524,14 +604,24 @@ $pasos = [
         dtPendientes = inicializarDataTable('#tablaPendientes', {
           ordering: false,
           placeholder: 'Buscar guía, remitente o destinatario...',
-          pageLength: 5,
-          responsive: false // el wrapper .table-responsive da scroll horizontal; así no choca con los checkboxes
+          pageLength: 5
+        });
+        // Repintar los botones de las filas nuevas en cada redibujado (cambio de página/filtro)
+        dtPendientes.on('draw', function () {
+          botonesTodos().each(function () { pintarBoton(this); });
+          actualizarContador();
         });
       } else if (dtPendientes) {
         dtPendientes.columns.adjust();
+        if (dtPendientes.responsive) dtPendientes.responsive.recalc();
       }
+      botonesTodos().each(function () { pintarBoton(this); });
+      actualizarContador();
     });
   }
+
+  // Estado inicial de los botones aunque el modal aún no se haya abierto
+  $('#tablaPendientes .btn-sel').each(function () { pintarBoton(this); });
 
   document.addEventListener('DOMContentLoaded', function () {
     const inicial = Math.min(TOTAL_PASOS, Math.max(1, <?= (int)$pasoInicial ?>));
