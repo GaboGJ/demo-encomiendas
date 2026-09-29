@@ -584,7 +584,11 @@ $thFirst = $thBase . ' ps-4 ps-md-5 pe-3';
       post('/despachos/despachar', { id_turno: ID_TURNO })
         .then(function (res) {
           // El mensaje de éxito ya quedó en Flash (servidor) y sale en el listado
-          if (res.success) window.location.href = baseUrl + '/despachos';
+          if (res.success) {
+            imprimirManifiestoDespacho(ID_TURNO, function () {
+              window.location.href = baseUrl + '/despachos';
+            });
+          }
           else { Swal.fire('No se pudo despachar', res.message, 'error'); btn.disabled = false; }
         }).catch(function () { errorServidor(); btn.disabled = false; });
     });

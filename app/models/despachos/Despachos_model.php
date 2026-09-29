@@ -281,9 +281,12 @@ class Despachos_model {
                         t.fecha_salida_turno, t.hora_salida_turno, t.precio_pasaje_turno,
                         et.nombre_estado_turno,
                         s_o.ciudad_sucursal AS ciudad_origen,
+                        s_o.nombre_sucursal AS nombre_sucursal_origen,
+                        s_o.direccion_sucursal AS direccion_sucursal_origen,
+                        sn.nombre_sindicato, sn.telefono_sindicato,
                         s_d.ciudad_sucursal AS ciudad_destino,
                         s_d.nombre_sucursal AS nombre_sucursal_destino,
-                        v.numero_interno_vehiculo, v.placa_vehiculo,
+                        v.numero_interno_vehiculo, v.placa_vehiculo, v.color_vehiculo,
                         mo.nombre_modelo, mo.total_asientos_modelo,
                         CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS nombre_chofer,
                         ch.licencia_chofer,
@@ -291,6 +294,7 @@ class Despachos_model {
                     FROM turnos t
                     INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
                     INNER JOIN sucursales s_o ON t.id_sucursal_origen = s_o.id_sucursal
+                    LEFT JOIN sindicatos sn ON s_o.id_sindicato = sn.id_sindicato
                     INNER JOIN sucursales s_d ON t.id_sucursal_destino = s_d.id_sucursal
                     LEFT JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
                     LEFT JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
@@ -339,6 +343,7 @@ class Despachos_model {
                     CAST(e.estado_pago_encomienda AS UNSIGNED) AS pagado,
                     CONCAT(pr.nombre_persona, ' ', pr.apellido_paterno_persona) AS remitente,
                     CONCAT(pd.nombre_persona, ' ', pd.apellido_paterno_persona) AS destinatario,
+                    pd.telefono_persona AS destinatario_celular,
                     (SELECT COUNT(*) FROM detalles_encomiendas de 
                       WHERE de.id_encomienda = e.id_encomienda 
                         AND (de.estado_detalle_encomienda = 1 OR de.estado_detalle_encomienda IS NULL)) AS total_bultos,
@@ -488,6 +493,19 @@ class Despachos_model {
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $e;
+        }
+    }
+
+    public function getNombreUsuario($id_usuario) {
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona)
+                FROM usuarios u INNER JOIN personas p ON u.id_persona = p.id_persona
+                WHERE u.id_usuario = :id LIMIT 1");
+            $st->execute([':id' => $id_usuario]);
+            return $st->fetchColumn() ?: '';
+        } catch (PDOException $e) {
+            return '';
         }
     }
 }

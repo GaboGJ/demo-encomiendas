@@ -103,9 +103,10 @@
                           <a href="javascript:;" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Ver Manifiesto">
                             <i class="material-symbols-rounded text-sm">visibility</i>
                           </a>
-                          <a href="javascript:;" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Imprimir Manifiesto">
+                          <button type="button" class="btn btn-link text-dark p-2 mb-0" title="Imprimir Hoja de Ruta"
+                                  onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)">
                             <i class="material-symbols-rounded text-sm">print</i>
-                          </a>
+                          </button>
                           <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Cancelar Turno">
                             <i class="material-symbols-rounded text-sm">block</i>
                           </a>

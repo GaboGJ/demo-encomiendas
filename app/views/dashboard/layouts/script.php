@@ -19,6 +19,12 @@
 
 <!-- FUNCIÓN GLOBAL DE IMPRESIÓN REUTILIZABLE -->
 <script>
+    /** Imprime la Hoja de Ruta / Guía de pasajeros y carga del turno */
+    function imprimirManifiestoDespacho(idTurno, onFinish) {
+        if (!idTurno) return;
+        const url = '<?= URL ?>/despachos/imprimirManifiesto?id=' + idTurno;
+        lanzarImpresionIframe(url, onFinish);
+    }
     /**
      * Imprime la Guía de encomienda usando el iframe oculto
      */

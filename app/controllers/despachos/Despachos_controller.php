@@ -247,5 +247,23 @@ class Despachos_controller {
         header('Location: ' . URL . ($success ? '/despachos' : '/despachos/new'));
         exit;
     }
+
+    /** Hoja de ruta / Guía de pasajeros y carga (imprimible). */
+    public function imprimirManifiesto() {
+        $id = intval($_GET['id'] ?? 0);
+        $id_sucursal_actual = $_SESSION['id_sucursal'] ?? 1;
+
+        $turno = $this->despachosModel->obtenerTurnoCompleto($id);
+        if (!$turno || intval($turno['id_sucursal_origen']) !== intval($id_sucursal_actual)) {
+            die('Error: El turno no existe o pertenece a otra sucursal.');
+        }
+
+        $pasajeros   = $this->despachosModel->getPasajerosPorTurno($id);
+        $encomiendas = $this->despachosModel->getEncomiendasAsignadas($id);
+        $despachador = $this->despachosModel->getNombreUsuario($_SESSION['id_usuario'] ?? 0);
+
+        require_once __DIR__ . '/../../views/dashboard/despachos/print.php';
+        exit;
+    }
 }
 ?>
