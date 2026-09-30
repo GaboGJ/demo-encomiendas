@@ -29,29 +29,29 @@
             </div>
             <p class="text-xs text-secondary mb-4">Acceso unificado para Clientes, Administradores y Choferes</p>
 
-            <form id="formLoginGeneral">
-              <div class="mb-3">
-                <label class="label-custom">Correo Electrónico o Usuario</label>
-                <input type="text" class="input-custom" placeholder="ejemplo@correo.com">
-              </div>
+<form id="formLoginGeneral" autocomplete="on">
+  <div class="mb-3">
+    <label class="label-custom">N° C.I. / Documento</label>
+    <input type="text" name="ci" class="input-custom" placeholder="Ej. 7845123 Beni" autocomplete="username" required>
+  </div>
 
-              <div class="mb-3">
-                <label class="label-custom">Contraseña</label>
-                <input type="password" class="input-custom" placeholder="••••••••">
-              </div>
+  <div class="mb-3">
+    <label class="label-custom">Contraseña</label>
+    <input type="password" name="password" class="input-custom" placeholder="••••••••" autocomplete="current-password" required>
+  </div>
 
-              <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-                <div class="form-check form-switch ps-0">
-                  <input class="form-check-input ms-auto" type="checkbox" id="rememberMe" checked>
-                  <label class="form-check-label text-xs text-secondary mb-0 ms-2" for="rememberMe">Recordarme</label>
-                </div>
-                <a href="javascript:;" class="text-xs text-success font-weight-bold">¿Olvidaste tu contraseña?</a>
-              </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div class="form-check form-switch ps-0">
+      <input class="form-check-input ms-auto" type="checkbox" id="rememberMe" checked>
+      <label class="form-check-label text-xs text-secondary mb-0 ms-2" for="rememberMe">Recordarme</label>
+    </div>
+    <a href="javascript:;" class="text-xs text-success font-weight-bold">¿Olvidaste tu contraseña?</a>
+  </div>
 
-<button type="button" onclick="window.location.href='<?= URL; ?>/dashboard'" class="btn bg-gradient-success border-radius-lg w-100 font-weight-bold text-capitalize shadow-success py-2 mb-0">
+  <button type="submit" class="btn bg-gradient-success border-radius-lg w-100 font-weight-bold text-capitalize shadow-success py-2 mb-0">
     Entrar al Sistema <span class="material-symbols-rounded text-sm ms-1 align-middle">arrow_forward</span>
-</button>
-            </form>
+  </button>
+</form>
           </div>
 
           <!-- REGISTRO -->
@@ -78,59 +78,54 @@
               <!-- CLIENTE -->
               <div class="tab-pane fade show active" id="pills-cliente" role="tabpanel">
                 <p class="text-xs text-secondary mb-3">Regístrate para ver el estado en tiempo real de tus encomiendas</p>
-                <form id="formRegistroCliente">
-                  <div class="row g-2">
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">Nombres *</label>
-                      <input type="text" class="input-custom" placeholder="Ej. Juan Carlos" required>
-                    </div>
+<form id="formRegistroCliente" novalidate>
+  <div class="row g-2">
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">Nombres *</label>
+      <input type="text" name="nombres" class="input-custom" placeholder="Ej. Juan Carlos" maxlength="50" required>
+    </div>
 
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">Apellidos *</label>
-                      <input type="text" class="input-custom" placeholder="Ej. Pérez" required>
-                    </div>
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">Apellidos *</label>
+      <input type="text" name="apellidos" class="input-custom" placeholder="Ej. Pérez Gómez" maxlength="100" required>
+    </div>
 
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">Teléfono / WhatsApp *</label>
-                      <input type="tel" class="input-custom" placeholder="Ej. 78512345" required>
-                    </div>
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">Teléfono / WhatsApp *</label>
+      <input type="tel" name="telefono" class="input-custom" placeholder="Ej. 78512345" maxlength="50" required>
+    </div>
 
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">N° C.I. / Documento *</label>
-                      <input type="text" class="input-custom" placeholder="Ej. 7845123 Beni" required>
-                    </div>
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">N° C.I. / Documento *</label>
+      <input type="text" name="ci" class="input-custom" placeholder="Ej. 7845123 Beni" maxlength="50" required>
+    </div>
 
-                    <div class="col-12">
-                      <label class="label-custom">Correo Electrónico *</label>
-                      <input type="email" class="input-custom" placeholder="cliente@correo.com" required>
-                    </div>
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">Contraseña *</label>
+      <input type="password" name="password" class="input-custom" placeholder="Mínimo 6 caracteres" minlength="6" required>
+    </div>
 
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">Contraseña *</label>
-                      <input type="password" class="input-custom" placeholder="Mínimo 6 caracteres" required>
-                    </div>
+    <div class="col-12 col-sm-6">
+      <label class="label-custom">Confirmar Contraseña *</label>
+      <input type="password" name="password_confirm" class="input-custom" placeholder="Repite la contraseña" minlength="6" required>
+    </div>
 
-                    <div class="col-12 col-sm-6">
-                      <label class="label-custom">Confirmar Contraseña *</label>
-                      <input type="password" class="input-custom" placeholder="Repite la contraseña" required>
-                    </div>
+    <div class="col-12 mt-2">
+      <div class="form-check p-0 ms-1">
+        <input class="form-check-input" type="checkbox" id="checkClienteTerminos" required>
+        <label class="form-check-label text-xs text-secondary ms-1" for="checkClienteTerminos">
+          Acepto Términos de Servicio y Rastreo
+        </label>
+      </div>
+    </div>
 
-                    <div class="col-12 mt-2">
-                      <div class="form-check p-0 ms-1">
-                        <input class="form-check-input" type="checkbox" id="checkClienteTerminos" required>
-                        <label class="form-check-label text-xs text-secondary ms-1" for="checkClienteTerminos">
-                          Acepto Términos de Servicio y Rastreo
-                        </label>
-                      </div>
-                    </div>
-
-                    <div class="col-12 mt-2">
-                      <button type="submit" class="btn bg-gradient-success border-radius-lg w-100 font-weight-bold text-capitalize shadow-success py-2 text-white">
-                        Registrarme como Cliente
-                      </button>
-                    </div>
-                  </div>
-                </form>
+    <div class="col-12 mt-2">
+      <button type="submit" class="btn bg-gradient-success border-radius-lg w-100 font-weight-bold text-capitalize shadow-success py-2 text-white">
+        Registrarme como Cliente
+      </button>
+    </div>
+  </div>
+</form>
               </div>
 
               <!-- SINDICATO EN PASOS -->
@@ -164,110 +159,96 @@
                   </div>
                 </div>
 
-                <form id="formRegistroSindicato">
-                  <div class="step-content-sindicato" id="step-sindicato-1">
-                    <div class="row g-2">
-                      <div class="col-12">
-                        <label class="label-custom">Nombre del Sindicato / Empresa *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. Sindicato Misto 18 de Noviembre" required>
-                      </div>
+<form id="formRegistroSindicato" novalidate>
+  <div class="step-content-sindicato" id="step-sindicato-1">
+    <div class="row g-2">
+      <div class="col-12">
+        <label class="label-custom">Nombre del Sindicato / Empresa *</label>
+        <input type="text" name="nombre_sindicato" class="input-custom" placeholder="Ej. Sindicato Mixto 18 de Noviembre" maxlength="50" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">NIT / Registro Legal *</label>
+        <input type="text" name="nit" class="input-custom" placeholder="Ej. 1028374019" maxlength="50" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">Teléfono Central *</label>
+        <input type="tel" name="telefono_sindicato" class="input-custom" placeholder="Ej. 3-4620000" maxlength="50" required>
+      </div>
+      <div class="col-12">
+        <label class="label-custom">Ciudad Sede Principal *</label>
+        <input type="text" name="ciudad" class="input-custom" placeholder="Ej. Trinidad" maxlength="50" required>
+      </div>
+    </div>
+  </div>
 
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">NIT / Registro Legal *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. 1028374019" required>
-                      </div>
+  <div class="step-content-sindicato d-none" id="step-sindicato-2">
+    <div class="row g-2">
+      <div class="col-12">
+        <label class="label-custom">Nombre Completo del Representante Legal *</label>
+        <input type="text" name="rep_nombre" class="input-custom" placeholder="Ej. Roberto Suárez Rojas" maxlength="150" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">C.I. Representante *</label>
+        <input type="text" name="rep_ci" class="input-custom" placeholder="Ej. 4587123 Beni" maxlength="50" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">Celular de Contacto *</label>
+        <input type="tel" name="rep_celular" class="input-custom" placeholder="Ej. 78512345" maxlength="50" required>
+      </div>
+    </div>
+  </div>
 
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">Teléfono Central *</label>
-                        <input type="tel" class="input-custom" placeholder="Ej. 3-4620000" required>
-                      </div>
+  <div class="step-content-sindicato d-none" id="step-sindicato-3">
+    <div class="row g-2">
+      <div class="col-12">
+        <p class="text-xs text-secondary mb-1">Ingresará al sistema con el C.I. del representante y esta contraseña.</p>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">Contraseña *</label>
+        <input type="password" name="password" class="input-custom" id="pass_sind1" placeholder="Mínimo 6 caracteres" minlength="6" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="label-custom">Confirmar Contraseña *</label>
+        <input type="password" name="password_confirm" class="input-custom" id="pass_sind2" placeholder="Repita contraseña" minlength="6" required>
+      </div>
+      <div class="col-12 mt-2">
+        <div class="form-check p-0 ms-1">
+          <input class="form-check-input" type="checkbox" id="checkSindicatoTerminos" required>
+          <label class="form-check-label text-xs text-secondary ms-1" for="checkSindicatoTerminos">
+            Acepto Términos de Administración y Gestión
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                      <div class="col-12">
-                        <label class="label-custom">Ciudad Sede Principal *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. Trinidad, Beni" required>
-                      </div>
-                    </div>
-                  </div>
+  <div class="border-top pt-3 mt-3">
+    <div class="d-flex justify-content-between align-items-center step-footer-sindicato" id="footer-sindicato-1">
+      <div></div>
+      <button type="button" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(2)">
+        Siguiente <i class="fas fa-arrow-right text-xxs ms-1"></i>
+      </button>
+    </div>
 
-                  <div class="step-content-sindicato d-none" id="step-sindicato-2">
-                    <div class="row g-2">
-                      <div class="col-12">
-                        <label class="label-custom">Nombre Representante Legal *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. Roberto Suárez" required>
-                      </div>
+    <div class="d-flex justify-content-between align-items-center step-footer-sindicato d-none" id="footer-sindicato-2">
+      <button type="button" class="btn btn-xs bg-gradient-secondary mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(1)">
+        <i class="fas fa-arrow-left text-xxs me-1"></i> Anterior
+      </button>
+      <button type="button" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(3)">
+        Siguiente <i class="fas fa-arrow-right text-xxs ms-1"></i>
+      </button>
+    </div>
 
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">C.I. Representante *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. 4587123 Beni" required>
-                      </div>
-
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">Celular de Contacto *</label>
-                        <input type="tel" class="input-custom" placeholder="Ej. 78512345" required>
-                      </div>
-
-                      <div class="col-12">
-                        <label class="label-custom">Cargo en el Sindicato *</label>
-                        <input type="text" class="input-custom" placeholder="Ej. Secretario General / Presidente" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="step-content-sindicato d-none" id="step-sindicato-3">
-                    <div class="row g-2">
-                      <div class="col-12">
-                        <label class="label-custom">Correo del Administrador *</label>
-                        <input type="email" class="input-custom" placeholder="admin@sindicato.com" required>
-                      </div>
-
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">Contraseña *</label>
-                        <input type="password" class="input-custom" id="pass_sind1" placeholder="Mínimo 6 caracteres" minlength="6" required>
-                      </div>
-
-                      <div class="col-12 col-sm-6">
-                        <label class="label-custom">Confirmar Contraseña *</label>
-                        <input type="password" class="input-custom" id="pass_sind2" placeholder="Repita contraseña" minlength="6" required>
-                      </div>
-
-                      <div class="col-12 mt-2">
-                        <div class="form-check p-0 ms-1">
-                          <input class="form-check-input" type="checkbox" id="checkSindicatoTerminos" required>
-                          <label class="form-check-label text-xs text-secondary ms-1" for="checkSindicatoTerminos">
-                            Acepto Términos de Administración y Gestión
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="border-top pt-3 mt-3">
-                    <div class="d-flex justify-content-between align-items-center step-footer-sindicato" id="footer-sindicato-1">
-                      <div></div>
-                      <button type="button" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(2)">
-                        Siguiente <i class="fas fa-arrow-right text-xxs ms-1"></i>
-                      </button>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center step-footer-sindicato d-none" id="footer-sindicato-2">
-                      <button type="button" class="btn btn-xs bg-gradient-secondary mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(1)">
-                        <i class="fas fa-arrow-left text-xxs me-1"></i> Anterior
-                      </button>
-                      <button type="button" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(3)">
-                        Siguiente <i class="fas fa-arrow-right text-xxs ms-1"></i>
-                      </button>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center step-footer-sindicato d-none" id="footer-sindicato-3">
-                      <button type="button" class="btn btn-xs bg-gradient-secondary mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(2)">
-                        <i class="fas fa-arrow-left text-xxs me-1"></i> Anterior
-                      </button>
-                      <button type="submit" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize">
-                        Registrar Sindicato <i class="fas fa-paper-plane ms-1 text-xxs"></i>
-                      </button>
-                    </div>
-                  </div>
-                </form>
+    <div class="d-flex justify-content-between align-items-center step-footer-sindicato d-none" id="footer-sindicato-3">
+      <button type="button" class="btn btn-xs bg-gradient-secondary mb-0 border-radius-md px-3 font-weight-bold text-capitalize" onclick="goToStepSindicato(2)">
+        <i class="fas fa-arrow-left text-xxs me-1"></i> Anterior
+      </button>
+      <button type="submit" class="btn btn-xs bg-gradient-success mb-0 border-radius-md px-3 font-weight-bold text-capitalize">
+        Registrar Sindicato <i class="fas fa-paper-plane ms-1 text-xxs"></i>
+      </button>
+    </div>
+  </div>
+</form>
               </div>
 
             </div>
@@ -580,15 +561,142 @@
       }
     }
 
-    $('#formRegistroSindicato').on('submit', function(e) {
-      e.preventDefault();
-      const p1 = $('#pass_sind1').val();
-      const p2 = $('#pass_sind2').val();
+ 
+</script>
 
-      if (p1 !== p2) {
-        alert('Las contraseñas no coinciden. Revisa nuevamente.');
+<script>
+(function () {
+  var baseUrl = '<?= rtrim(URL, "/") ?>';
+
+  function aviso(icono, titulo, texto) {
+    if (typeof Swal !== 'undefined') Swal.fire({ icon: icono, title: titulo, text: texto });
+    else alert(titulo + '\n' + texto);
+  }
+
+  function enviar(url, form) {
+    return fetch(baseUrl + url, { method: 'POST', body: new FormData(form) })
+      .then(function (r) { return r.json(); });
+  }
+
+  function errorServidor(btn) {
+    btn.disabled = false;
+    aviso('error', 'Error', 'No se pudo comunicar con el servidor. Intente nuevamente.');
+  }
+
+  function irALogin(ci) {
+    verLogin();
+    var campo = document.querySelector('#formLoginGeneral [name="ci"]');
+    if (campo && ci) campo.value = ci;
+  }
+
+  /* ---------------- LOGIN ---------------- */
+  document.getElementById('formLoginGeneral').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = this, btn = form.querySelector('button[type="submit"]');
+
+    if (!form.ci.value.trim() || !form.password.value) {
+      aviso('warning', 'Datos incompletos', 'Ingrese su C.I. y su contraseña.');
+      return;
+    }
+
+    btn.disabled = true;
+    enviar('/auth/login', form)
+      .then(function (res) {
+        if (res.success) { window.location.href = res.redirect; return; }
+        btn.disabled = false;
+        aviso('error', 'No se pudo ingresar', res.message);
+      })
+      .catch(function () { errorServidor(btn); });
+  });
+
+  /* ---------------- REGISTRO CLIENTE ---------------- */
+  document.getElementById('formRegistroCliente').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = this, btn = form.querySelector('button[type="submit"]');
+
+    var requeridos = form.querySelectorAll('input[required]:not([type="checkbox"])');
+    for (var i = 0; i < requeridos.length; i++) {
+      if (!requeridos[i].value.trim()) {
+        requeridos[i].focus();
+        aviso('warning', 'Datos incompletos', 'Complete todos los campos obligatorios.');
         return;
       }
-      alert('¡Registro de Sindicato completado con éxito!');
-    });
+    }
+    if (form.password.value.length < 6) {
+      aviso('warning', 'Contraseña corta', 'La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (form.password.value !== form.password_confirm.value) {
+      aviso('warning', 'Contraseñas distintas', 'Las contraseñas no coinciden. Revise nuevamente.');
+      return;
+    }
+    if (!document.getElementById('checkClienteTerminos').checked) {
+      aviso('warning', 'Términos', 'Debe aceptar los Términos de Servicio y Rastreo.');
+      return;
+    }
+
+    btn.disabled = true;
+    enviar('/auth/registrarCliente', form)
+      .then(function (res) {
+        btn.disabled = false;
+        if (res.success) {
+          aviso('success', 'Cuenta creada', res.message);
+          form.reset();
+          irALogin(res.ci);
+        } else {
+          aviso('error', 'No se pudo registrar', res.message);
+        }
+      })
+      .catch(function () { errorServidor(btn); });
+  });
+
+  /* ---------------- REGISTRO SINDICATO ---------------- */
+  function validarSindicato(form) {
+    var campos = form.querySelectorAll('[required]');
+    for (var i = 0; i < campos.length; i++) {
+      var c = campos[i];
+      var vacio = c.type === 'checkbox' ? !c.checked : c.value.trim() === '';
+      if (vacio) {
+        var paso = c.closest('.step-content-sindicato').id.replace('step-sindicato-', '');
+        goToStepSindicato(parseInt(paso, 10));
+        c.focus();
+        aviso('warning', 'Dato requerido', 'Complete todos los campos obligatorios del paso ' + paso + '.');
+        return false;
+      }
+    }
+    if (form.password.value.length < 6) {
+      goToStepSindicato(3);
+      aviso('warning', 'Contraseña corta', 'La contraseña debe tener al menos 6 caracteres.');
+      return false;
+    }
+    if (form.password.value !== form.password_confirm.value) {
+      goToStepSindicato(3);
+      aviso('warning', 'Contraseñas distintas', 'Las contraseñas no coinciden. Revise nuevamente.');
+      return false;
+    }
+    return true;
+  }
+
+  document.getElementById('formRegistroSindicato').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = this, btn = form.querySelector('button[type="submit"]');
+
+    if (!validarSindicato(form)) return;
+
+    btn.disabled = true;
+    enviar('/auth/registrarSindicato', form)
+      .then(function (res) {
+        btn.disabled = false;
+        if (res.success) {
+          aviso('success', 'Sindicato registrado', res.message);
+          form.reset();
+          goToStepSindicato(1);
+          irALogin(res.ci);
+        } else {
+          aviso('error', 'No se pudo registrar', res.message);
+        }
+      })
+      .catch(function () { errorServidor(btn); });
+  });
+})();
 </script>
