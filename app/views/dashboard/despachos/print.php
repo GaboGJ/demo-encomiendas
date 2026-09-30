@@ -21,7 +21,6 @@ $totalPeso    = array_sum(array_column($encomiendas, 'peso_total'));
 
 // Filas en blanco para anotaciones manuales (como el talonario físico)
 $filasPas = max(count($pasajeros), $capacidad, 7);
-$filasEnc = max(count($encomiendas), 8);
 
 $fechaSalida = !empty($turno['fecha_salida_turno']) ? date('d/m/Y', strtotime($turno['fecha_salida_turno'])) : date('d/m/Y');
 $horaSalida  = !empty($turno['hora_salida_turno']) ? substr($turno['hora_salida_turno'], 0, 5) : '--:--';
@@ -191,28 +190,30 @@ $horaSalida  = !empty($turno['hora_salida_turno']) ? substr($turno['hora_salida_
                     <th style="width:100px;" class="num">Bs. / Cobro</th>
                 </tr>
             </thead>
-            <tbody>
-                <?php for ($i = 0; $i < $filasEnc; $i++): $e = $encomiendas[$i] ?? null; ?>
-                    <tr>
-                        <td class="ctr"><?= $i + 1 ?></td>
-                        <?php if ($e): ?>
-                            <td>#<?= $h($e['guia_encomienda']) ?></td>
-                            <td>
-                                <?= $h($e['declaracion_encomienda'] ?: '-') ?>
-                                <span class="sub"><?= (int)$e['total_bultos'] ?> bulto(s)<?= $e['peso_total'] > 0 ? ' · ' . number_format($e['peso_total'], 1) . ' Kg' : '' ?></span>
-                            </td>
-                            <td><?= $h($e['remitente']) ?> ➔ <strong><?= $h($e['destinatario']) ?></strong></td>
-                            <td><?= $h($e['destinatario_celular']) ?></td>
-                            <td class="num">
-                                <?= number_format($e['monto_encomienda'], 2) ?>
-                                <span class="tag <?= $e['pagado'] ? 'pag' : 'cod' ?>"><?= $e['pagado'] ? 'PAGADO' : 'COD' ?></span>
-                            </td>
-                        <?php else: ?>
-                            <td></td><td></td><td></td><td></td><td></td>
-                        <?php endif; ?>
-                    </tr>
-                <?php endfor; ?>
-            </tbody>
+ <tbody>
+    <?php if (!empty($encomiendas)): ?>
+        <?php foreach ($encomiendas as $i => $e): ?>
+            <tr>
+                <td class="ctr"><?= $i + 1 ?></td>
+                <td>#<?= $h($e['guia_encomienda']) ?></td>
+                <td>
+                    <?= $h($e['declaracion_encomienda'] ?: '-') ?>
+                    <span class="sub"><?= (int)$e['total_bultos'] ?> bulto(s)<?= $e['peso_total'] > 0 ? ' · ' . number_format($e['peso_total'], 1) . ' Kg' : '' ?></span>
+                </td>
+                <td><?= $h($e['remitente']) ?> ➔ <strong><?= $h($e['destinatario']) ?></strong></td>
+                <td><?= $h($e['destinatario_celular']) ?></td>
+                <td class="num">
+                    <?= number_format($e['monto_encomienda'], 2) ?>
+                    <span class="tag <?= $e['pagado'] ? 'pag' : 'cod' ?>"><?= $e['pagado'] ? 'PAGADO' : 'COD' ?></span>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr>
+            <td colspan="6" class="ctr" style="color:var(--text-muted);">Sin encomiendas asignadas a este turno</td>
+        </tr>
+    <?php endif; ?>
+</tbody>
         </table>
     </div>
 

@@ -94,19 +94,24 @@
                       </td>
                       <td class="align-middle text-end py-3 pe-5 ps-4">
                         <div class="d-flex align-items-center justify-content-end gap-1">
-                          <?php if ($esEnTurno): ?>
-                            <!-- Botón de asignación visible si está En Turno -->
-                            <a href="<?= URL ?>/despachos/asign?id=<?= $d['id_turno'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Asignar Pasajes y Encomiendas">
-                              <i class="material-symbols-rounded text-sm">assignment</i>
-                            </a>
-                          <?php endif; ?>
+    <?php if ($esDespachado): ?>
+      <!-- Ya despachado: solo imprimir la hoja de ruta -->
+      <button type="button" class="btn btn-link text-dark p-2 mb-0" title="Imprimir Hoja de Ruta"
+              onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)">
+        <i class="material-symbols-rounded text-sm">print</i>
+      </button>
+    <?php elseif ($esEnTurno): ?>
+      <!-- Aún no despachado: solo asignar pasajes y encomiendas -->
+      <a href="<?= URL ?>/despachos/asign?id=<?= (int)$d['id_turno'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Asignar Pasajes y Encomiendas">
+        <i class="material-symbols-rounded text-sm">assignment</i>
+      </a>
+    <?php endif; ?>
+  
+
                           <a href="javascript:;" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Ver Manifiesto">
                             <i class="material-symbols-rounded text-sm">visibility</i>
                           </a>
-                          <button type="button" class="btn btn-link text-dark p-2 mb-0" title="Imprimir Hoja de Ruta"
-                                  onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)">
-                            <i class="material-symbols-rounded text-sm">print</i>
-                          </button>
+                          
                           <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Cancelar Turno">
                             <i class="material-symbols-rounded text-sm">block</i>
                           </a>
