@@ -50,8 +50,7 @@
                 <button type="button" onclick="verLogin()" class="btn btn-sm bg-gradient-success mb-2 w-100 text-white">
                   <span class="material-symbols-rounded me-1 align-middle text-sm">login</span> Iniciar Sesión
                 </button>
-                <button type="button" onclick="
-                ()" class="btn btn-sm btn-outline-success mb-0 w-100">
+                <button type="button" onclick="verRegistro()" class="btn btn-sm btn-outline-success mb-0 w-100">
                   <span class="material-symbols-rounded me-1 align-middle text-sm">person_add</span> Registrarse
                 </button>
               </div>

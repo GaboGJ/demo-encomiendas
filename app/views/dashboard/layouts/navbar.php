@@ -74,7 +74,7 @@
             </li>
             <hr class="horizontal dark my-2">
             <li>
-              <a class="dropdown-item border-radius-md text-danger d-flex align-items-center" href="<?= URL; ?>/auth/auth_controller/index">
+              <a class="dropdown-item border-radius-md text-danger d-flex align-items-center" href="<?= URL; ?>/auth/logout">
                 <i class="material-symbols-rounded text-sm me-2 text-danger">logout</i>
                 <span class="text-sm font-weight-bold">Cerrar Sesión</span>
               </a>

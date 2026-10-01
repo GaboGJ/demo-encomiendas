@@ -2,7 +2,12 @@
 /**
  * Auth_model
  * Login por C.I. (personas.carnet_persona) + registro de Cliente y Sindicato.
- * Los errores de BD suben al controlador (que maneja la transacción).
+ * Los errores de BD suben al controlador, que maneja la transacción.
+ *
+ * Tablas afectadas en el registro:
+ *   personas  -> usuarios                              (Cliente)
+ *   personas  -> sindicatos -> sucursales -> usuarios  (Sindicato)
+ *   roles (se crea si no existe)
  */
 class Auth_model {
     const ROL_CLIENTE   = 'Cliente';
@@ -13,7 +18,18 @@ class Auth_model {
     public function __construct() {
         global $pdo;
         $this->pdo = $pdo;
+        // Garantiza que cualquier error SQL lance PDOException (no falle en silencio)
+        if ($this->pdo) {
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        }
     }
+
+    /* ---------------- Transacciones ---------------- */
+    public function iniciarTransaccion() { if (!$this->pdo->inTransaction()) $this->pdo->beginTransaction(); }
+    public function confirmar()          { if ($this->pdo->inTransaction()) $this->pdo->commit(); }
+    public function revertir()           { if ($this->pdo->inTransaction()) $this->pdo->rollBack(); }
+
+    /* ---------------- Login ---------------- */
 
     /** Usuario vigente (no eliminado) con persona, rol y sucursal. Incluye el hash. */
     public function obtenerUsuarioPorCarnet($ci) {
@@ -37,6 +53,14 @@ class Auth_model {
         return $st->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /** Actualiza el hash (se llama tras un login correcto si el algoritmo cambió). */
+    public function actualizarHash($id_usuario, $password) {
+        $st = $this->pdo->prepare("UPDATE usuarios SET password_usuario = :pw, update_usuario = NOW() WHERE id_usuario = :id");
+        $st->execute([':pw' => password_hash($password, PASSWORD_BCRYPT), ':id' => $id_usuario]);
+    }
+
+    /* ---------------- Personas ---------------- */
+
     public function buscarPersonaPorCi($ci) {
         $st = $this->pdo->prepare("SELECT * FROM personas WHERE carnet_persona = :ci LIMIT 1");
         $st->execute([':ci' => $ci]);
@@ -49,6 +73,7 @@ class Auth_model {
         return (int)$st->fetchColumn() > 0;
     }
 
+    /** personas: apellido_paterno_persona y telefono_persona son NOT NULL. */
     public function insertarPersona($ci, $nombres, $paterno, $materno, $telefono) {
         $st = $this->pdo->prepare(
             "INSERT INTO personas (carnet_persona, nombre_persona, apellido_paterno_persona, apellido_materno_persona, telefono_persona, estado_persona, create_persona)
@@ -61,15 +86,18 @@ class Auth_model {
         return (int)$this->pdo->lastInsertId();
     }
 
-    /** Solo completa el teléfono si la persona ya existía (no pisa nombres). */
+    /** Si la persona ya existía solo se actualiza el teléfono (no se pisan nombres). */
     public function actualizarTelefonoPersona($id_persona, $telefono) {
         $st = $this->pdo->prepare("UPDATE personas SET telefono_persona = :t, update_persona = NOW() WHERE id_persona = :id");
         $st->execute([':t' => $telefono, ':id' => $id_persona]);
     }
 
+    /* ---------------- Roles / sucursal por defecto ---------------- */
+
     /** Devuelve el id del rol por nombre; si no existe lo crea (la BD no trae datos semilla). */
     public function obtenerOCrearRol($nombre, $descripcion) {
-        $st = $this->pdo->prepare("SELECT id_rol FROM roles WHERE LOWER(nombre_rol) = :n AND delete_rol IS NULL LIMIT 1");
+        // nombre_rol es UNIQUE: se busca sin filtrar delete_rol para no chocar con uno eliminado
+        $st = $this->pdo->prepare("SELECT id_rol FROM roles WHERE LOWER(nombre_rol) = :n LIMIT 1");
         $st->execute([':n' => mb_strtolower($nombre, 'UTF-8')]);
         $id = $st->fetchColumn();
         if ($id) return (int)$id;
@@ -94,12 +122,15 @@ class Auth_model {
         return $id ? (int)$id : null;
     }
 
+    /* ---------------- Sindicato / Sucursal / Usuario ---------------- */
+
     public function existeSindicato($nombre) {
         $st = $this->pdo->prepare("SELECT COUNT(*) FROM sindicatos WHERE LOWER(nombre_sindicato) = :n");
         $st->execute([':n' => mb_strtolower($nombre, 'UTF-8')]);
         return (int)$st->fetchColumn() > 0;
     }
 
+    /** $d: nombre, sigla, nit (personeria), telefono, direccion */
     public function insertarSindicato($d) {
         $st = $this->pdo->prepare(
             "INSERT INTO sindicatos (nombre_sindicato, sigla_sindicato, personeria_sindicato, telefono_sindicato, direccion_sindicato, es_principal_sindicato, estado_sindicato, create_sindicato)
@@ -115,6 +146,7 @@ class Auth_model {
         return (int)$this->pdo->lastInsertId();
     }
 
+    /** sucursales: direccion_sucursal es NOT NULL. */
     public function insertarSucursal($id_sindicato, $nombre, $ciudad, $direccion) {
         $st = $this->pdo->prepare(
             "INSERT INTO sucursales (id_sindicato, nombre_sucursal, ciudad_sucursal, direccion_sucursal, estado_sucursal, create_sucursal)
@@ -134,12 +166,6 @@ class Auth_model {
             ':pw' => password_hash($password, PASSWORD_BCRYPT)
         ]);
         return (int)$this->pdo->lastInsertId();
-    }
-
-    /** Actualiza el hash si el algoritmo/costo cambió (se llama tras un login correcto). */
-    public function actualizarHash($id_usuario, $password) {
-        $st = $this->pdo->prepare("UPDATE usuarios SET password_usuario = :pw WHERE id_usuario = :id");
-        $st->execute([':pw' => password_hash($password, PASSWORD_BCRYPT), ':id' => $id_usuario]);
     }
 }
 ?>
