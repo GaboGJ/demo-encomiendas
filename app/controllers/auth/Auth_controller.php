@@ -1,11 +1,18 @@
 <?php
 require_once __DIR__ . '/../../models/auth/Auth_model.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarPersona.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarPassword.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarSindicato.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarLogin.php';
 
 class Auth_controller {
 
     private $authModel;
 
     public function __construct() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         $this->authModel = new Auth_model();
     }
 
@@ -30,33 +37,41 @@ class Auth_controller {
     /* ============================ LOGIN ============================ */
 
     public function login() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->json(['success' => false, 'message' => 'Método no permitido.']);
-        }
+        $this->soloPost();
 
-        $ci       = $this->post('ci');
+        $ci       = ValidarPersona::normalizarCi($this->post('ci'));
         $password = (string)($_POST['password'] ?? '');
 
-        if ($ci === '' || $password === '') {
-            $this->json(['success' => false, 'message' => 'Ingrese su C.I. y su contraseña.']);
+        $error = ValidarLogin::validar($ci, $password);
+        if ($error !== null) {
+            $this->json(['success' => false, 'message' => $error]);
         }
 
         try {
             $u = $this->authModel->obtenerUsuarioPorCarnet($ci);
 
-            // Mismo mensaje para "no existe" y "contraseña incorrecta"
-            if (!$u || !password_verify($password, $u['password_usuario'])) {
-                $this->json(['success' => false, 'message' => 'C.I. o contraseña incorrectos.']);
-            }
+// 1. Verificar si el C.I. existe
+if (!$u) {
+    $this->json(['success' => false, 'message' => 'C.I. o contraseña incorrectos.']);
+}
+
+// 2. Verificar contraseña
+$ok = password_verify($password, $u['password_usuario']);
+if (!$ok) {
+    $this->json(['success' => false, 'message' => 'Contraseña incorrecta.']);
+}
 
             if ((int)$u['estado_usuario'] !== 1) {
                 $this->json(['success' => false, 'message' => 'Su cuenta está inactiva. Contacte al administrador.']);
             }
-            if ((int)$u['estado_rol'] !== 1) {
+            if ((int)$u['activo_rol'] !== 1) {
                 $this->json(['success' => false, 'message' => 'Su rol está deshabilitado. Contacte al administrador.']);
             }
-            if ((int)$u['estado_sucursal'] !== 1) {
+            if ((int)$u['activo_sucursal'] !== 1) {
                 $this->json(['success' => false, 'message' => 'Su sucursal está deshabilitada. Contacte al administrador.']);
+            }
+            if ((int)$u['activo_sindicato'] !== 1) {
+                $this->json(['success' => false, 'message' => 'Su sindicato está deshabilitado. Contacte al administrador.']);
             }
 
             if (password_needs_rehash($u['password_usuario'], PASSWORD_BCRYPT)) {
@@ -66,14 +81,16 @@ class Auth_controller {
             // Evita fijación de sesión
             session_regenerate_id(true);
 
-            $_SESSION['id_usuario']     = (int)$u['id_usuario'];
-            $_SESSION['id_persona']     = (int)$u['id_persona'];
-            $_SESSION['id_sucursal']    = (int)$u['id_sucursal'];
-            $_SESSION['id_sindicato']   = (int)$u['id_sindicato'];
-            $_SESSION['id_rol']         = (int)$u['id_rol'];
-            $_SESSION['nombre_rol']     = $u['nombre_rol'];
-            $_SESSION['nombre_usuario'] = trim($u['nombre_persona'] . ' ' . $u['apellido_paterno_persona']);
-            $_SESSION['ciudad']         = $u['ciudad_sucursal'];
+            $_SESSION['id_usuario']      = (int)$u['id_usuario'];
+            $_SESSION['id_persona']      = (int)$u['id_persona'];
+            $_SESSION['id_sucursal']     = (int)$u['id_sucursal'];
+            $_SESSION['id_sindicato']    = (int)$u['id_sindicato'];
+            $_SESSION['es_principal']    = (int)$u['es_principal_sindicato'];
+            $_SESSION['id_rol']          = (int)$u['id_rol'];
+            $_SESSION['nombre_rol']      = $u['nombre_rol'];
+            $_SESSION['nombre_usuario']  = trim($u['nombre_persona'] . ' ' . $u['apellido_paterno_persona']);
+            $_SESSION['nombre_sindicato']= $u['nombre_sindicato'];
+            $_SESSION['ciudad']          = $u['ciudad_sucursal'];
 
             $this->json([
                 'success'  => true,
@@ -86,101 +103,48 @@ class Auth_controller {
         }
     }
 
-    /* ============================ REGISTRO CLIENTE ============================ */
-
-    public function registrarCliente() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->json(['success' => false, 'message' => 'Método no permitido.']);
-        }
-
-        $ci       = $this->post('ci');
-        $nombres  = $this->post('nombres');
-        $paterno  = $this->post('paterno');
-        $materno  = $this->post('materno');
-        $telefono = $this->post('telefono');
-        $password = (string)($_POST['password'] ?? '');
-        $password2= (string)($_POST['password_confirm'] ?? '');
-
-        $this->validarPersona($ci, $nombres, $paterno, $materno, $telefono);
-        $this->validarPassword($password, $password2);
-
-        global $pdo;
-
-        try {
-            $pdo->beginTransaction();
-
-            $persona = $this->authModel->buscarPersonaPorCi($ci);
-            if ($persona) {
-                $idPersona = (int)$persona['id_persona'];
-                if ($this->authModel->existeUsuarioVigentePorPersona($idPersona)) {
-                    throw new Exception('Ya existe una cuenta registrada con ese C.I.');
-                }
-                $this->authModel->actualizarTelefonoPersona($idPersona, $telefono);
-            } else {
-                $idPersona = $this->authModel->insertarPersona($ci, $nombres, $paterno, $materno, $telefono);
-            }
-
-            $idSucursal = $this->authModel->obtenerSucursalPorDefecto();
-            if (!$idSucursal) {
-                throw new Exception('El sistema aún no tiene sucursales configuradas. Contacte al administrador.');
-            }
-
-            $idRol = $this->authModel->obtenerOCrearRol(Auth_model::ROL_CLIENTE, 'Cliente con acceso a rastreo de encomiendas');
-            $this->authModel->crearUsuario($idPersona, $idSucursal, $idRol, $password);
-
-            $pdo->commit();
-
-            $this->json(['success' => true, 'message' => 'Cuenta creada correctamente. Ya puede iniciar sesión con su C.I.', 'ci' => $ci]);
-
-        } catch (PDOException $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            error_log('Auth registrarCliente: ' . $e->getMessage());
-            $this->json(['success' => false, 'message' => 'No se pudo registrar (error de base de datos). Revise el log de PHP.']);
-        } catch (Exception $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            $this->json(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
-
     /* ============================ REGISTRO SINDICATO ============================ */
 
+    /**
+     * Crea en una sola transacción: persona (representante) -> sindicato (principal)
+     * -> sucursal "Casa Matriz" -> usuario administrador.
+     */
     public function registrarSindicato() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->json(['success' => false, 'message' => 'Método no permitido.']);
-        }
+        $this->soloPost();
 
+        // Paso 1: institución
         $nombreSind = $this->post('nombre_sindicato');
         $nit        = $this->post('nit');
         $telSind    = $this->post('telefono_sindicato');
         $ciudad     = $this->post('ciudad');
+        $direccion  = $this->post('direccion');
 
-        $ci       = $this->post('rep_ci');
+        // Paso 2: representante legal (será el administrador)
+        $ci       = ValidarPersona::normalizarCi($this->post('rep_ci'));
         $nombres  = $this->post('rep_nombres');
         $paterno  = $this->post('rep_paterno');
         $materno  = $this->post('rep_materno');
         $celular  = $this->post('rep_celular');
 
-        $password = (string)($_POST['password'] ?? '');
-        $password2= (string)($_POST['password_confirm'] ?? '');
+        // Paso 3: acceso
+        $password  = (string)($_POST['password'] ?? '');
+        $password2 = (string)($_POST['password_confirm'] ?? '');
 
-        if ($nombreSind === '' || $nit === '' || $telSind === '' || $ciudad === '') {
-            $this->json(['success' => false, 'message' => 'Complete los datos de la institución (nombre, NIT, teléfono y ciudad).']);
+        $error = ValidarSindicato::validar($nombreSind, $nit, $telSind, $ciudad, $direccion)
+              ?? ValidarPersona::validar($ci, $nombres, $paterno, $materno, $celular)
+              ?? ValidarPassword::validar($password, $password2);
+        if ($error !== null) {
+            $this->json(['success' => false, 'message' => $error]);
         }
-        foreach ([$nombreSind, $nit, $telSind, $ciudad] as $v) {
-            if (mb_strlen($v, 'UTF-8') > 50) {
-                $this->json(['success' => false, 'message' => 'Los datos de la institución no pueden superar 50 caracteres.']);
-            }
-        }
-        $this->validarPersona($ci, $nombres, $paterno, $materno, $celular);
-        $this->validarPassword($password, $password2);
-
-        global $pdo;
 
         try {
-            $pdo->beginTransaction();
+            $this->authModel->iniciarTransaccion();
 
             if ($this->authModel->existeSindicato($nombreSind)) {
                 throw new Exception('Ya existe un sindicato registrado con ese nombre.');
+            }
+            if ($this->authModel->existeNit($nit)) {
+                throw new Exception('Ya existe un sindicato registrado con ese NIT.');
             }
 
             // Representante legal = administrador del sindicato
@@ -195,30 +159,36 @@ class Auth_controller {
                 $idPersona = $this->authModel->insertarPersona($ci, $nombres, $paterno, $materno, $celular);
             }
 
+            // El modelo lo inserta con es_principal_sindicato = 1
             $idSindicato = $this->authModel->insertarSindicato([
                 'nombre'    => $nombreSind,
                 'sigla'     => '',
                 'nit'       => $nit,
                 'telefono'  => $telSind,
-                'direccion' => $ciudad
+                'direccion' => $direccion
             ]);
 
             // usuarios.id_sucursal es NOT NULL: se crea la sucursal sede del sindicato
-            $idSucursal = $this->authModel->insertarSucursal($idSindicato, 'Casa Matriz', $ciudad, $ciudad);
+            $idSucursal = $this->authModel->insertarSucursal($idSindicato, 'Casa Matriz', $ciudad, $direccion);
 
-            $idRol = $this->authModel->obtenerOCrearRol(Auth_model::ROL_ADMIN_SIN, 'Administrador de un sindicato afiliado');
+            // El usuario creado con el sindicato es administrador
+            $idRol = $this->authModel->obtenerOCrearRol(Auth_model::ROL_ADMIN_SIN, 'Administrador');
             $this->authModel->crearUsuario($idPersona, $idSucursal, $idRol, $password);
 
-            $pdo->commit();
+            $this->authModel->confirmar();
 
             $this->json(['success' => true, 'message' => 'Sindicato registrado correctamente. Ingrese con el C.I. del representante.', 'ci' => $ci]);
 
         } catch (PDOException $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            $this->authModel->revertir();
+            // 1062 = clave duplicada (otra petición se adelantó a las verificaciones de arriba)
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+                $this->json(['success' => false, 'message' => 'Ya existe un registro con esos datos (nombre del sindicato, NIT o C.I.).']);
+            }
             error_log('Auth registrarSindicato: ' . $e->getMessage());
             $this->json(['success' => false, 'message' => 'No se pudo registrar el sindicato (error de base de datos). Revise el log de PHP.']);
         } catch (Exception $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
+            $this->authModel->revertir();
             $this->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
@@ -237,32 +207,16 @@ class Auth_controller {
         exit;
     }
 
-    /* ============================ HELPERS ============================ */
+    /* ============================ UTILIDADES ============================ */
 
     private function post($key) {
         return trim((string)($_POST[$key] ?? ''));
     }
 
-    private function validarPersona($ci, $nombres, $paterno, $materno, $telefono) {
-        if ($ci === '' || $nombres === '' || $paterno === '' || $telefono === '') {
-            $this->json(['success' => false, 'message' => 'C.I., nombres, apellido paterno y teléfono son obligatorios.']);
-        }
-        foreach ([$ci, $nombres, $paterno, $materno, $telefono] as $v) {
-            if (mb_strlen($v, 'UTF-8') > 50) {
-                $this->json(['success' => false, 'message' => 'Ningún dato personal puede superar 50 caracteres.']);
-            }
-        }
-        if (!preg_match('/^[0-9+\-\s]{6,20}$/', $telefono)) {
-            $this->json(['success' => false, 'message' => 'El teléfono solo puede contener números (6 a 20 dígitos).']);
-        }
-    }
-
-    private function validarPassword($password, $password2) {
-        if (strlen($password) < 6) {
-            $this->json(['success' => false, 'message' => 'La contraseña debe tener al menos 6 caracteres.']);
-        }
-        if ($password !== $password2) {
-            $this->json(['success' => false, 'message' => 'Las contraseñas no coinciden.']);
+    private function soloPost() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            $this->json(['success' => false, 'message' => 'Método no permitido.']);
         }
     }
 
@@ -273,4 +227,3 @@ class Auth_controller {
         exit;
     }
 }
-?>

@@ -1,16 +1,14 @@
 <?php
 /**
  * Auth_model
- * Login por C.I. (personas.carnet_persona) + registro de Cliente y Sindicato.
+ * Login por C.I. (personas.carnet_persona) + registro de Sindicato.
  * Los errores de BD suben al controlador, que maneja la transacción.
  *
  * Tablas afectadas en el registro:
- *   personas  -> usuarios                              (Cliente)
- *   personas  -> sindicatos -> sucursales -> usuarios  (Sindicato)
+ *   personas -> sindicatos -> sucursales -> usuarios
  *   roles (se crea si no existe)
  */
 class Auth_model {
-    const ROL_CLIENTE   = 'Cliente';
     const ROL_ADMIN_SIN = 'Administrador Sindicato';
 
     private $pdo;
@@ -18,7 +16,7 @@ class Auth_model {
     public function __construct() {
         global $pdo;
         $this->pdo = $pdo;
-        // Garantiza que cualquier error SQL lance PDOException (no falle en silencio)
+        // Cualquier error SQL lanza PDOException (no falla en silencio)
         if ($this->pdo) {
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         }
@@ -31,20 +29,27 @@ class Auth_model {
 
     /* ---------------- Login ---------------- */
 
-    /** Usuario vigente (no eliminado) con persona, rol y sucursal. Incluye el hash. */
+    /**
+     * Usuario vigente (no eliminado) con persona, rol, sucursal y sindicato. Incluye el hash.
+     * Las columnas BIT se castean a entero; "activo_*" ya considera también el delete_*.
+     */
     public function obtenerUsuarioPorCarnet($ci) {
-        $sql = "SELECT 
+        $sql = "SELECT
                     u.id_usuario, u.id_persona, u.id_sucursal, u.id_rol, u.password_usuario,
                     CAST(IFNULL(u.estado_usuario, 1) AS UNSIGNED) AS estado_usuario,
                     p.carnet_persona, p.nombre_persona, p.apellido_paterno_persona,
                     r.nombre_rol,
-                    CAST(IFNULL(r.estado_rol, 1) AS UNSIGNED) AS estado_rol,
+                    CAST(IFNULL(r.estado_rol, 1) = 1 AND r.delete_rol IS NULL AS UNSIGNED) AS activo_rol,
                     s.nombre_sucursal, s.ciudad_sucursal, s.id_sindicato,
-                    CAST(IFNULL(s.estado_sucursal, 1) AS UNSIGNED) AS estado_sucursal
+                    CAST(IFNULL(s.estado_sucursal, 1) = 1 AND s.delete_sucursal IS NULL AS UNSIGNED) AS activo_sucursal,
+                    sn.nombre_sindicato,
+                    CAST(IFNULL(sn.es_principal_sindicato, 0) AS UNSIGNED) AS es_principal_sindicato,
+                    CAST(IFNULL(sn.estado_sindicato, 1) = 1 AND sn.delete_sindicato IS NULL AS UNSIGNED) AS activo_sindicato
                 FROM usuarios u
-                INNER JOIN personas p   ON u.id_persona = p.id_persona
-                INNER JOIN roles r      ON u.id_rol = r.id_rol
-                INNER JOIN sucursales s ON u.id_sucursal = s.id_sucursal
+                INNER JOIN personas p    ON u.id_persona = p.id_persona
+                INNER JOIN roles r       ON u.id_rol = r.id_rol
+                INNER JOIN sucursales s  ON u.id_sucursal = s.id_sucursal
+                INNER JOIN sindicatos sn ON s.id_sindicato = sn.id_sindicato
                 WHERE p.carnet_persona = :ci AND u.delete_usuario IS NULL
                 ORDER BY u.id_usuario DESC
                 LIMIT 1";
@@ -92,7 +97,7 @@ class Auth_model {
         $st->execute([':t' => $telefono, ':id' => $id_persona]);
     }
 
-    /* ---------------- Roles / sucursal por defecto ---------------- */
+    /* ---------------- Roles ---------------- */
 
     /** Devuelve el id del rol por nombre; si no existe lo crea (la BD no trae datos semilla). */
     public function obtenerOCrearRol($nombre, $descripcion) {
@@ -107,21 +112,6 @@ class Auth_model {
         return (int)$this->pdo->lastInsertId();
     }
 
-    /**
-     * usuarios.id_sucursal es NOT NULL y un cliente no pertenece a una sucursal:
-     * se le asigna la de la casa matriz (sindicato principal) o, si no hay, la primera activa.
-     */
-    public function obtenerSucursalPorDefecto() {
-        $sql = "SELECT s.id_sucursal 
-                FROM sucursales s
-                INNER JOIN sindicatos sn ON s.id_sindicato = sn.id_sindicato
-                WHERE (s.estado_sucursal = 1 OR s.estado_sucursal IS NULL) AND s.delete_sucursal IS NULL
-                ORDER BY IFNULL(sn.es_principal_sindicato, 0) DESC, s.id_sucursal ASC
-                LIMIT 1";
-        $id = $this->pdo->query($sql)->fetchColumn();
-        return $id ? (int)$id : null;
-    }
-
     /* ---------------- Sindicato / Sucursal / Usuario ---------------- */
 
     public function existeSindicato($nombre) {
@@ -130,11 +120,21 @@ class Auth_model {
         return (int)$st->fetchColumn() > 0;
     }
 
-    /** $d: nombre, sigla, nit (personeria), telefono, direccion */
+    /** El NIT se guarda en personeria_sindicato. */
+    public function existeNit($nit) {
+        $st = $this->pdo->prepare("SELECT COUNT(*) FROM sindicatos WHERE personeria_sindicato = :n");
+        $st->execute([':n' => $nit]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
+    /**
+     * El sindicato que se registra queda marcado como principal (es_principal_sindicato = 1).
+     * $d: nombre, sigla, nit (personeria), telefono, direccion
+     */
     public function insertarSindicato($d) {
         $st = $this->pdo->prepare(
             "INSERT INTO sindicatos (nombre_sindicato, sigla_sindicato, personeria_sindicato, telefono_sindicato, direccion_sindicato, es_principal_sindicato, estado_sindicato, create_sindicato)
-             VALUES (:n, :s, :p, :t, :d, 0, 1, NOW())"
+             VALUES (:n, :s, :p, :t, :d, 1, 1, NOW())"
         );
         $st->execute([
             ':n' => $d['nombre'],
@@ -168,4 +168,3 @@ class Auth_model {
         return (int)$this->pdo->lastInsertId();
     }
 }
-?>
