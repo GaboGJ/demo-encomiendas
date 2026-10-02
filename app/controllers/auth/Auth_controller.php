@@ -92,6 +92,14 @@ if (!$ok) {
             $_SESSION['nombre_sindicato']= $u['nombre_sindicato'];
             $_SESSION['ciudad']          = $u['ciudad_sucursal'];
 
+            // Mensaje de bienvenida (se muestra con SweetAlert en el dashboard)
+Flash::set(
+    true,
+    'Has ingresado como ' . $u['nombre_rol'] . ' en ' . $u['nombre_sindicato'] . '.',
+    '¡Bienvenido, ' . $_SESSION['nombre_usuario'] . '!',
+    'success'
+);
+
             $this->json([
                 'success'  => true,
                 'redirect' => rtrim(URL, '/') . '/dashboard'
