@@ -311,7 +311,8 @@
         inicializarDataTable('#datatable-roles',        { ordering: false, placeholder: 'Buscar rol...' });
         inicializarDataTable('#datatable-sindicatos',   { ordering: false, placeholder: 'Buscar sindicato o secretario...' });
         inicializarDataTable('#datatable-reportes',     { ordering: false, placeholder: 'Buscar en el reporte...' });
-
+  // La función inicializarDataTable vive en layouts/script.php (se carga después de esta vista)
+inicializarDataTable('#datatable-sindicatos-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
         // --- Rutas + modal de edición de tarifa ---
         inicializarDataTable('#datatable-rutas', { ordering: false, placeholder: 'Buscar ruta o destino...' });
 
