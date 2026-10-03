@@ -317,6 +317,7 @@
         inicializarDataTable('#datatable-rutas', { ordering: false, placeholder: 'Buscar ruta o destino...' });
         inicializarDataTable('#datatable-choferes',          { ordering: false, placeholder: 'Buscar chofer, C.I. o licencia...' });
         inicializarDataTable('#datatable-choferes-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
+        inicializarDataTable('#datatable-moviles-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
 
         var modalEditarTarifa = document.getElementById('modalEditarTarifa');
         if (modalEditarTarifa) {
