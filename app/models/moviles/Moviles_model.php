@@ -187,28 +187,26 @@ class Moviles_model {
      * @return array|null ['campo' => 'numero'|'placa']
      */
     public function buscarDuplicado($numero, $placa, $id_sindicato, $excluirId = 0) {
-        $sql = "SELECT v.numero_interno_vehiculo, v.placa_vehiculo
+        $sql = "SELECT
+                    MAX(so.id_sindicato = :s AND LOWER(v.numero_interno_vehiculo) = :n) AS dup_numero,
+                    MAX(:p1 <> '' AND UPPER(v.placa_vehiculo) = :p2) AS dup_placa
                 FROM vehiculos v
                 INNER JOIN socios so ON v.id_socio = so.id_socio
                 WHERE v.delete_vehiculo IS NULL
-                  AND v.id_vehiculo <> :x
-                  AND ((so.id_sindicato = :s AND LOWER(v.numero_interno_vehiculo) = :n)
-                       OR (:p1 <> '' AND UPPER(v.placa_vehiculo) = :p2))";
+                AND v.id_vehiculo <> :x";
         $st = $this->pdo->prepare($sql);
         $st->execute([
-            ':x'  => (int)$excluirId,
             ':s'  => (int)$id_sindicato,
             ':n'  => mb_strtolower($numero, 'UTF-8'),
             ':p1' => $placa,
-            ':p2' => $placa
+            ':p2' => $placa,
+            ':x'  => (int)$excluirId
         ]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
 
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) {
-            if (mb_strtolower($f['numero_interno_vehiculo'], 'UTF-8') === mb_strtolower($numero, 'UTF-8')) {
-                return ['campo' => 'numero'];
-            }
-        }
-        return $placa !== '' ? ['campo' => 'placa'] : null;
+        if ($f && (int)$f['dup_numero'] === 1) return ['campo' => 'numero'];
+        if ($f && (int)$f['dup_placa']  === 1) return ['campo' => 'placa'];
+        return null;
     }
 
     /** ¿Tiene turnos abiertos (no despachados ni cancelados)? Misma regla que Despachos_model::esTurnoAbierto. */
@@ -304,17 +302,29 @@ class Moviles_model {
                         TRIM(CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona, ' ', IFNULL(p.apellido_materno_persona, ''))) AS nombre_chofer,
                         IF(vc.id_vehiculo_chofer IS NULL, 0, 1) AS asignado,
                         CAST(IFNULL(vc.titular_vehiculo_chofer, 0) AS UNSIGNED) AS titular,
-                        (SELECT COUNT(*) FROM socios so WHERE so.id_persona = ch.id_persona AND so.delete_socio IS NULL) AS es_socio
+                        IF(tit.id_persona IS NULL, 0, 1) AS es_socio_titular
                     FROM choferes ch
                     INNER JOIN personas p ON ch.id_persona = p.id_persona
+                    LEFT JOIN (
+                        SELECT so.id_persona
+                        FROM vehiculos v INNER JOIN socios so ON v.id_socio = so.id_socio
+                        WHERE v.id_vehiculo = :v1
+                    ) tit ON tit.id_persona = ch.id_persona
                     LEFT JOIN vehiculos_choferes vc
-                           ON vc.id_chofer = ch.id_chofer AND vc.id_vehiculo = :v
-                          AND vc.delete_vehiculo_chofer IS NULL
-                          AND (vc.estado_vehiculo_chofer = 1 OR vc.estado_vehiculo_chofer IS NULL)
-                    WHERE ch.delete_chofer IS NULL AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
-                    ORDER BY asignado DESC, titular DESC, nombre_chofer ASC";
+                        ON vc.id_chofer = ch.id_chofer AND vc.id_vehiculo = :v2
+                        AND vc.delete_vehiculo_chofer IS NULL
+                        AND (vc.estado_vehiculo_chofer = 1 OR vc.estado_vehiculo_chofer IS NULL)
+                    WHERE ch.delete_chofer IS NULL
+                    AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
+                    AND (
+                            tit.id_persona IS NOT NULL
+                        OR vc.id_vehiculo_chofer IS NOT NULL
+                        OR NOT EXISTS (SELECT 1 FROM socios s2
+                                        WHERE s2.id_persona = ch.id_persona AND s2.delete_socio IS NULL)
+                    )
+                    ORDER BY es_socio_titular DESC, asignado DESC, titular DESC, nombre_chofer ASC";
             $st = $this->pdo->prepare($sql);
-            $st->execute([':v' => $id_vehiculo]);
+            $st->execute([':v1' => $id_vehiculo, ':v2' => $id_vehiculo]);
             return $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Moviles_model::getChoferesParaAsignar: ' . $e->getMessage());
