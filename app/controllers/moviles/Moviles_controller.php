@@ -234,7 +234,7 @@ class Moviles_controller {
         ]);
     }
 
-    /** AJAX POST: id_vehiculo + ids_json (["3","7"]) + id_titular. */
+        /** AJAX POST: id_vehiculo + ids_json (["3","7"]). El titular lo define el servidor (socio titular del móvil). */
     public function guardarChoferes() {
         $this->acceso(true);
         $this->soloPost();
@@ -247,10 +247,9 @@ class Moviles_controller {
 
         $ids = json_decode($_POST['ids_json'] ?? '[]', true);
         if (!is_array($ids)) $ids = [];
-        $titular = intval($_POST['id_titular'] ?? 0);
 
         try {
-            $this->movilesModel->sincronizarChoferes($id, $ids, $titular);
+            $this->movilesModel->sincronizarChoferes($id, $ids);
             Flash::set(true, 'Los choferes de la "Unidad ' . $movil['numero_interno_vehiculo'] . '" fueron actualizados correctamente.', 'Choferes Asignados');
             $this->json(['success' => true]);
         } catch (PDOException $e) {

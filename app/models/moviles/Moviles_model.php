@@ -352,12 +352,26 @@ class Moviles_model {
      *    salvo que tenga turnos abiertos.
      * Lanza Exception con mensaje legible.
      */
-    public function sincronizarChoferes($id_vehiculo, array $ids, $id_titular) {
+    public function sincronizarChoferes($id_vehiculo, array $ids) {
         $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
-        $id_titular = (int)$id_titular;
 
-        if ($ids && !in_array($id_titular, $ids, true)) {
-            throw new Exception('Debe elegir un chofer titular entre los seleccionados.');
+        // El titular es el chofer que corresponde al socio titular del vehículo (uno solo).
+        $st = $this->pdo->prepare(
+            "SELECT ch.id_chofer
+             FROM vehiculos v
+             INNER JOIN socios so ON v.id_socio = so.id_socio
+             INNER JOIN choferes ch ON ch.id_persona = so.id_persona
+             WHERE v.id_vehiculo = :v
+               AND ch.delete_chofer IS NULL
+               AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
+             LIMIT 1"
+        );
+        $st->execute([':v' => $id_vehiculo]);
+        $id_titular = (int)$st->fetchColumn(); // 0 si el socio no tiene chofer activo
+
+        // El titular siempre queda asignado
+        if ($id_titular > 0 && !in_array($id_titular, $ids, true)) {
+            $ids[] = $id_titular;
         }
 
         if ($ids) {
