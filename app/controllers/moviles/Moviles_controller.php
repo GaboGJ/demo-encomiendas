@@ -219,6 +219,46 @@ class Moviles_controller {
             $this->errorBd($e, 'restaurar');
         }
     }
+        /** AJAX GET ?id=: móvil + choferes activos con su estado de asignación. */
+    public function choferesAsignacion() {
+        $this->acceso(true);
+        $id = intval($_GET['id'] ?? 0);
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        if (!$movil) {
+            $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
+        }
+        $this->json([
+            'success'  => true,
+            'movil'    => 'Unidad ' . $movil['numero_interno_vehiculo'],
+            'choferes' => $this->movilesModel->getChoferesParaAsignar($id),
+        ]);
+    }
+
+    /** AJAX POST: id_vehiculo + ids_json (["3","7"]) + id_titular. */
+    public function guardarChoferes() {
+        $this->acceso(true);
+        $this->soloPost();
+
+        $id = intval($_POST['id_vehiculo'] ?? 0);
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        if (!$movil) {
+            $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
+        }
+
+        $ids = json_decode($_POST['ids_json'] ?? '[]', true);
+        if (!is_array($ids)) $ids = [];
+        $titular = intval($_POST['id_titular'] ?? 0);
+
+        try {
+            $this->movilesModel->sincronizarChoferes($id, $ids, $titular);
+            Flash::set(true, 'Los choferes de la "Unidad ' . $movil['numero_interno_vehiculo'] . '" fueron actualizados correctamente.', 'Choferes Asignados');
+            $this->json(['success' => true]);
+        } catch (PDOException $e) {
+            $this->errorBd($e, 'guardarChoferes');
+        } catch (Exception $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
 
     /* ============================ PRIVADOS ============================ */
 

@@ -53,6 +53,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'socios') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/socios">
+          <i class="material-symbols-rounded opacity-5">handshake</i>
+          <span class="nav-link-text ms-1">Socios</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'choferes') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/choferes">
           <i class="material-symbols-rounded opacity-5">badge</i>
           <span class="nav-link-text ms-1">Choferes</span>

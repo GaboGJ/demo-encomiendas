@@ -318,6 +318,8 @@
         inicializarDataTable('#datatable-choferes',          { ordering: false, placeholder: 'Buscar chofer, C.I. o licencia...' });
         inicializarDataTable('#datatable-choferes-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
         inicializarDataTable('#datatable-moviles-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
+        inicializarDataTable('#datatable-socios',          { ordering: false, placeholder: 'Buscar socio, C.I. o código...' });
+        inicializarDataTable('#datatable-socios-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
 
         var modalEditarTarifa = document.getElementById('modalEditarTarifa');
         if (modalEditarTarifa) {

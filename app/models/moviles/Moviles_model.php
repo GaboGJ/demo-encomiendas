@@ -295,5 +295,121 @@ class Moviles_model {
             ':c'  => $d['color'] !== '' ? $d['color'] : null
         ];
     }
+
+        /** Choferes activos para el modal de asignación, marcando los ya asignados a este móvil. */
+    public function getChoferesParaAsignar($id_vehiculo) {
+        try {
+            $sql = "SELECT
+                        ch.id_chofer, ch.licencia_chofer, p.carnet_persona,
+                        TRIM(CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona, ' ', IFNULL(p.apellido_materno_persona, ''))) AS nombre_chofer,
+                        IF(vc.id_vehiculo_chofer IS NULL, 0, 1) AS asignado,
+                        CAST(IFNULL(vc.titular_vehiculo_chofer, 0) AS UNSIGNED) AS titular,
+                        (SELECT COUNT(*) FROM socios so WHERE so.id_persona = ch.id_persona AND so.delete_socio IS NULL) AS es_socio
+                    FROM choferes ch
+                    INNER JOIN personas p ON ch.id_persona = p.id_persona
+                    LEFT JOIN vehiculos_choferes vc
+                           ON vc.id_chofer = ch.id_chofer AND vc.id_vehiculo = :v
+                          AND vc.delete_vehiculo_chofer IS NULL
+                          AND (vc.estado_vehiculo_chofer = 1 OR vc.estado_vehiculo_chofer IS NULL)
+                    WHERE ch.delete_chofer IS NULL AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
+                    ORDER BY asignado DESC, titular DESC, nombre_chofer ASC";
+            $st = $this->pdo->prepare($sql);
+            $st->execute([':v' => $id_vehiculo]);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Moviles_model::getChoferesParaAsignar: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function vcTieneTurnosAbiertos($id_vehiculo_chofer) {
+        $st = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM turnos t
+             INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+             WHERE t.id_vehiculo_chofer = :vc
+               AND (t.estado_turno = 1 OR t.estado_turno IS NULL)
+               AND (LOWER(et.nombre_estado_turno) LIKE '%turno%' OR LOWER(et.nombre_estado_turno) = 'pendiente')"
+        );
+        $st->execute([':vc' => $id_vehiculo_chofer]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
+    /**
+     * Sincroniza vehiculos_choferes del móvil en UNA transacción:
+     *  - chofer seleccionado: se crea la fila, o se reactiva si ya existía (UK_vehiculo_chofer
+     *    cuenta también las filas dadas de baja), con titular = 1 solo para $id_titular.
+     *  - chofer ya asignado y no seleccionado: baja suave (estado 0 + delete_vehiculo_chofer),
+     *    salvo que tenga turnos abiertos.
+     * Lanza Exception con mensaje legible.
+     */
+    public function sincronizarChoferes($id_vehiculo, array $ids, $id_titular) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        $id_titular = (int)$id_titular;
+
+        if ($ids && !in_array($id_titular, $ids, true)) {
+            throw new Exception('Debe elegir un chofer titular entre los seleccionados.');
+        }
+
+        if ($ids) {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            $st = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM choferes
+                 WHERE id_chofer IN ($in) AND delete_chofer IS NULL AND (estado_chofer = 1 OR estado_chofer IS NULL)"
+            );
+            $st->execute($ids);
+            if ((int)$st->fetchColumn() !== count($ids)) {
+                throw new Exception('Algún chofer seleccionado está inactivo o eliminado. Quítelo de la selección.');
+            }
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT id_vehiculo_chofer, id_chofer,
+                        (delete_vehiculo_chofer IS NULL AND (estado_vehiculo_chofer = 1 OR estado_vehiculo_chofer IS NULL)) AS vigente
+                 FROM vehiculos_choferes WHERE id_vehiculo = :v FOR UPDATE"
+            );
+            $st->execute([':v' => $id_vehiculo]);
+            $existentes = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) $existentes[(int)$f['id_chofer']] = $f;
+
+            foreach ($ids as $idChofer) {
+                $titular = ($idChofer === $id_titular) ? 1 : 0;
+                if (isset($existentes[$idChofer])) {
+                    $this->pdo->prepare(
+                        "UPDATE vehiculos_choferes
+                         SET titular_vehiculo_chofer = $titular, estado_vehiculo_chofer = 1,
+                             delete_vehiculo_chofer = NULL, update_vehiculo_chofer = NOW()
+                         WHERE id_vehiculo_chofer = :id"
+                    )->execute([':id' => $existentes[$idChofer]['id_vehiculo_chofer']]);
+                } else {
+                    $this->pdo->prepare(
+                        "INSERT INTO vehiculos_choferes
+                            (id_vehiculo, id_chofer, titular_vehiculo_chofer, estado_vehiculo_chofer, create_vehiculo_chofer)
+                         VALUES (:v, :c, $titular, 1, NOW())"
+                    )->execute([':v' => $id_vehiculo, ':c' => $idChofer]);
+                }
+            }
+
+            foreach ($existentes as $idChofer => $f) {
+                if (in_array($idChofer, $ids, true) || !(int)$f['vigente']) continue;
+                if ($this->vcTieneTurnosAbiertos($f['id_vehiculo_chofer'])) {
+                    throw new Exception('No se puede quitar un chofer que tiene turnos abiertos en este móvil. Despache o cancele esos turnos primero.');
+                }
+                $this->pdo->prepare(
+                    "UPDATE vehiculos_choferes
+                     SET titular_vehiculo_chofer = 0, estado_vehiculo_chofer = 0,
+                         delete_vehiculo_chofer = NOW(), update_vehiculo_chofer = NOW()
+                     WHERE id_vehiculo_chofer = :id"
+                )->execute([':id' => $f['id_vehiculo_chofer']]);
+            }
+
+            $this->pdo->commit();
+            return true;
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
+    }
 }
 ?>

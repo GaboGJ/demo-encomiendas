@@ -1,4 +1,5 @@
 <?php require_once __DIR__ . '/detail.php'; ?>
+<?php require_once __DIR__ . '/asign.php'; ?>
 <?php
   $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 
@@ -118,6 +119,10 @@
                         <button type="button" class="btn btn-link text-info p-2 mb-0" title="Ver Detalle" onclick="verDetalleMovil(<?= (int)$m['id_vehiculo'] ?>)">
                           <i class="material-symbols-rounded text-sm">visibility</i>
                         </button>
+                        <button type="button" class="btn btn-link text-success p-2 mb-0" title="Asignar choferes"
+                                onclick="abrirAsignarChoferes(<?= (int)$m['id_vehiculo'] ?>)">
+                          <i class="material-symbols-rounded text-sm">group_add</i>
+                        </button>
                         <a href="<?= rtrim(URL, '/') ?>/moviles/update?id=<?= (int)$m['id_vehiculo'] ?>" class="btn btn-link text-dark p-2 mb-0" title="Editar Unidad">
                           <i class="material-symbols-rounded text-sm">edit</i>
                         </a>
@@ -136,6 +141,7 @@
                                 onclick="eliminarMovil(<?= (int)$m['id_vehiculo'] ?>, '<?= $nombreJs ?>')">
                           <i class="material-symbols-rounded text-sm">delete</i>
                         </button>
+                        
                       </div>
                     </td>
                   </tr>
