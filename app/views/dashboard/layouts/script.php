@@ -320,6 +320,11 @@
         inicializarDataTable('#datatable-moviles-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
         inicializarDataTable('#datatable-socios',          { ordering: false, placeholder: 'Buscar socio, C.I. o código...' });
         inicializarDataTable('#datatable-socios-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
+        // --- Roles y permisos ---
+        // (#datatable-roles ya estaba registrada arriba)
+        inicializarDataTable('#datatable-roles-papelera', { ordering: false, placeholder: 'Buscar en la papelera...' });
+        // Matriz de permisos: sin Responsive porque su renderer clonaría las casillas y perdería el estado de los interruptores
+        inicializarDataTable('#tablaPermisos', { ordering: false, placeholder: 'Buscar módulo...'});
 
         var modalEditarTarifa = document.getElementById('modalEditarTarifa');
         if (modalEditarTarifa) {
