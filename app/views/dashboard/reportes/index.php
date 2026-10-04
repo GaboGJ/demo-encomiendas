@@ -1,29 +1,32 @@
 <?php
 /**
  * views/dashboard/reportes/index.php
- * Variables: $tipos, $sucursales, $veTodas, $mesActual, $mesInicio
+ * Variables: $tipos, $sucursales, $veTodas, $mesActual, $anioActual, $hoy, $inicioMes
  */
 $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 $tarjetas = [
-  ['kIng', 'Ingresos del Periodo', 'payments',            'bg-gradient-success', 'shadow-success', 'text-success'],
-  ['kEgr', 'Egresos',              'trending_down',       'bg-gradient-info',    'shadow-info',    'text-danger'],
-  ['kPre', 'Préstamos',            'request_quote',       'bg-gradient-warning', 'shadow-warning', 'text-dark'],
-  ['kSal', 'Saldo Final',          'savings',             'bg-gradient-dark',    'shadow-dark',    'text-dark'],
+  ['kIni', 'Saldo Inicial / Vienen',  'account_balance_wallet', 'bg-gradient-dark',    'shadow-dark',    'text-dark'],
+  ['kIng', 'Ingresos Totales',        'payments',               'bg-gradient-success', 'shadow-success', 'text-success'],
+  ['kEgr', 'Egresos y Préstamos',     'trending_down',          'bg-gradient-info',    'shadow-info',    'text-danger'],
+  ['kSal', 'Saldo Final',             'savings',                'bg-gradient-success', 'shadow-success', 'text-success'],
 ];
 ?>
 <style>
-  .rep-tipos { display: flex; gap: .5rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .rep-tipos .btn { white-space: nowrap; flex-shrink: 0; }
   .rep-tabla thead th { text-transform: uppercase; font-size: .65rem; font-weight: 700; color: #8392ab; white-space: nowrap;
                         padding: .75rem .6rem; border-top: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5; }
   .rep-tabla tbody td { padding: .6rem; vertical-align: middle; }
   .rep-tabla tfoot td { padding: .7rem .6rem; font-weight: 800; background: #e8f5e9; font-size: .8rem; }
   .rep-saldo { font-size: .8rem; font-weight: 800; color: #344767; }
+  .rep-tipos { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 0; }
+  .rep-tipos .btn { white-space: nowrap; flex-shrink: 0; margin-bottom: 0; border-radius: 0; }
+  .rep-tipos .btn:first-child { border-radius: .5rem 0 0 .5rem; }
+  .rep-tipos .btn:last-child  { border-radius: 0 .5rem .5rem 0; }
+  .rep-tipos .btn + .btn { margin-left: -1px; }
 </style>
 
 <div class="container-fluid py-3 flex-grow-1">
 
-  <!-- TARJETAS -->
+  <!-- TARJETAS DE MÉTRICAS (se actualizan al generar) -->
   <div class="row mb-4">
     <?php foreach ($tarjetas as $i => $t): ?>
       <div class="col-xl-3 col-sm-6 <?= $i < 3 ? 'mb-xl-0 mb-4' : '' ?>">
@@ -45,8 +48,8 @@ $tarjetas = [
     <div class="card border-0 shadow-sm border-radius-xl p-3 p-md-4">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
         <div>
-          <h5 class="font-weight-bolder text-dark mb-1">Informes Económicos</h5>
-          <p class="text-xs text-secondary mb-0">Genere el resumen mensual o el informe de un mes. Puede imprimirlo o exportarlo a Excel.</p>
+          <h5 class="font-weight-bolder text-dark mb-1">Generador de Informes Económicos</h5>
+          <p class="text-xs text-secondary mb-0" id="repDescTipo">Control financiero por periodo.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
           <button type="button" class="btn btn-sm btn-outline-secondary mb-0 d-inline-flex align-items-center gap-1" id="btnImprimir">
@@ -58,33 +61,37 @@ $tarjetas = [
         </div>
       </div>
 
-      <div class="rep-tipos mb-3" id="tiposReporte">
-        <?php $primero = true; foreach ($tipos as $k => $t): ?>
-          <button type="button" class="btn btn-sm mb-0 d-inline-flex align-items-center gap-1 <?= $primero ? 'bg-gradient-success text-white' : 'btn-outline-success' ?>"
-                  data-tipo="<?= $h($k) ?>" title="<?= $h($t['desc']) ?>">
+      <!-- TIPO DE REPORTE: botones agrupados -->
+      <label class="form-label text-xs font-weight-bold text-dark mb-1">Tipo de Reporte</label>
+      <div class="rep-tipos mb-3" id="tiposReporte" role="group">
+        <?php foreach ($tipos as $k => $t): ?>
+          <button type="button"
+                  class="btn btn-sm d-inline-flex align-items-center gap-1 <?= $k === 'consolidado' ? 'bg-gradient-success text-white' : 'btn-outline-success' ?>"
+                  data-tipo="<?= $h($k) ?>" data-desc="<?= $h($t['desc']) ?>" data-titulo="<?= $h($t['titulo']) ?>">
             <i class="material-symbols-rounded text-sm"><?= $h($t['icono']) ?></i> <?= $h($t['titulo']) ?>
           </button>
-        <?php $primero = false; endforeach; ?>
+        <?php endforeach; ?>
       </div>
 
       <div class="row g-3 align-items-end">
-        <div class="col-6 col-lg-2" data-grupo="resumen">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Desde (mes)</label>
-          <div class="input-group input-group-outline is-filled"><input type="month" class="form-control" id="fDesde" value="<?= $h($mesInicio) ?>"></div>
-        </div>
-        <div class="col-6 col-lg-2" data-grupo="resumen">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Hasta (mes)</label>
-          <div class="input-group input-group-outline is-filled"><input type="month" class="form-control" id="fHasta" value="<?= $h($mesActual) ?>"></div>
-        </div>
-        <div class="col-12 col-lg-2 d-none" data-grupo="detalle">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Mes del informe</label>
+        <div class="col-6 col-md-3 d-none" data-tipos="diario semanal mensual">
+          <label class="form-label text-xs font-weight-bold text-dark mb-0">Mes</label>
           <div class="input-group input-group-outline is-filled"><input type="month" class="form-control" id="fMes" value="<?= $h($mesActual) ?>"></div>
         </div>
-        <div class="col-6 col-lg-2">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0" id="lblSaldo">Saldo inicial (Bs.)</label>
-          <div class="input-group input-group-outline is-filled"><input type="number" step="0.01" class="form-control" id="fSaldo" value="0.00"></div>
+        <div class="col-6 col-md-3 d-none" data-tipos="anual">
+          <label class="form-label text-xs font-weight-bold text-dark mb-0">Gestión (año)</label>
+          <div class="input-group input-group-outline is-filled"><input type="number" min="2000" max="2100" step="1" class="form-control" id="fAnio" value="<?= $h($anioActual) ?>"></div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-md-3 d-none" data-tipos="rango">
+          <label class="form-label text-xs font-weight-bold text-dark mb-0">Fecha inicio</label>
+          <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fDesde" value="<?= $h($inicioMes) ?>"></div>
+        </div>
+        <div class="col-6 col-md-3 d-none" data-tipos="rango">
+          <label class="form-label text-xs font-weight-bold text-dark mb-0">Fecha fin</label>
+          <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fHasta" value="<?= $h($hoy) ?>"></div>
+        </div>
+
+        <div class="col-12 col-md-6 col-lg-4">
           <label class="form-label text-xs font-weight-bold text-dark mb-0">Sucursal</label>
           <div class="input-group input-group-outline is-filled">
             <select class="form-control" id="fSucursal" <?= (!$veTodas || count($sucursales) <= 1) ? 'disabled' : '' ?>>
@@ -95,18 +102,10 @@ $tarjetas = [
             </select>
           </div>
         </div>
-        <div class="col-12 col-lg-3">
+        <div class="col-12 col-md-4 col-lg-2">
           <button type="button" class="btn btn-sm bg-gradient-dark w-100 mb-0 d-inline-flex align-items-center justify-content-center gap-1" id="btnGenerar">
-            <i class="material-symbols-rounded text-sm">filter_alt</i> Generar
+            <i class="material-symbols-rounded text-sm">filter_alt</i> Aplicar
           </button>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="input-group input-group-outline"><label class="form-label">Encargado de Finanzas (para la firma)</label>
-            <input type="text" class="form-control" id="fFinanzas" maxlength="60"></div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="input-group input-group-outline"><label class="form-label">Encargado de parada (para la firma)</label>
-            <input type="text" class="form-control" id="fParada" maxlength="60"></div>
         </div>
       </div>
     </div>
@@ -115,10 +114,13 @@ $tarjetas = [
   <!-- RESULTADO -->
   <div class="row"><div class="col-12">
     <div class="card border-0 shadow-sm border-radius-xl overflow-hidden mb-4">
-      <div class="card-header bg-white p-3 p-md-4">
-        <h6 class="font-weight-bolder text-dark mb-0" id="repTitulo">Informe</h6>
-        <p class="text-xxs text-secondary mb-1" id="repSub">&nbsp;</p>
-        <span class="rep-saldo" id="repSaldo"></span>
+      <div class="card-header bg-white p-3 p-md-4 d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+        <div>
+          <h6 class="font-weight-bolder text-dark mb-0" id="repTitulo">Informe</h6>
+          <p class="text-xxs text-secondary mb-1" id="repSub">&nbsp;</p>
+          <span class="rep-saldo" id="repSaldo"></span>
+        </div>
+        <span class="badge bg-gradient-success text-xxs px-2 py-1" id="repBadge">Filtro: Consolidado</span>
       </div>
       <hr class="horizontal dark my-0 opacity-2">
       <div class="card-body px-0 pt-3 pb-2" id="repContenedor">
@@ -136,7 +138,9 @@ $tarjetas = [
   const num = (n, dec) => (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   const bs = n => 'Bs. ' + num(n, 2);
 
-  let tipo = 'resumen', generando = false;
+  let tipoActual = 'consolidado';
+  let reqId = 0;      // solo la respuesta de la última petición se pinta
+  let tablaSeq = 0;   // ids únicos de tabla en cada generación
 
   function celda(tipoCol) {
     return function (d, type) {
@@ -148,30 +152,60 @@ $tarjetas = [
   }
 
   function qs() {
-    const p = new URLSearchParams({
-      tipo: tipo, desde: $('fDesde').value, hasta: $('fHasta').value, mes: $('fMes').value,
-      saldo: $('fSaldo').value, sucursal: $('fSucursal').value || 0,
-      finanzas: $('fFinanzas').value, parada: $('fParada').value
-    });
-    return p.toString();
+    return new URLSearchParams({
+      tipo: tipoActual, mes: $('fMes').value, anio: $('fAnio').value,
+      desde: $('fDesde').value, hasta: $('fHasta').value,
+      sucursal: $('fSucursal').value || 0
+    }).toString();
   }
 
   function valido() {
-    if (tipo === 'detalle') {
-      if (!$('fMes').value) { Swal.fire({ icon: 'warning', title: 'Falta el mes', text: 'Seleccione el mes del informe.' }); return false; }
-    } else if (!$('fDesde').value || !$('fHasta').value || $('fDesde').value > $('fHasta').value) {
-      Swal.fire({ icon: 'warning', title: 'Periodo inválido', text: 'Indique mes de inicio y de fin (inicio no mayor al fin).' }); return false;
+    const t = tipoActual;
+    if (['diario', 'semanal', 'mensual'].indexOf(t) !== -1 && !$('fMes').value) {
+      Swal.fire({ icon: 'warning', title: 'Falta el mes', text: 'Seleccione el mes del informe.' }); return false;
+    }
+    if (t === 'anual') {
+      const a = parseInt($('fAnio').value);
+      if (!a || a < 2000 || a > 2100) { Swal.fire({ icon: 'warning', title: 'Año inválido', text: 'Indique un año entre 2000 y 2100.' }); return false; }
+    }
+    if (t === 'rango' && (!$('fDesde').value || !$('fHasta').value || $('fDesde').value > $('fHasta').value)) {
+      Swal.fire({ icon: 'warning', title: 'Rango inválido', text: 'Indique fecha de inicio y fin (inicio no mayor al fin).' }); return false;
     }
     return true;
   }
 
-  function pintarTablas(r) {
+  function aplicarTipo(btn) {
+    tipoActual = btn.dataset.tipo;
+    document.querySelectorAll('#tiposReporte [data-tipo]').forEach(function (x) {
+      const on = x === btn;
+      x.classList.toggle('bg-gradient-success', on);
+      x.classList.toggle('text-white', on);
+      x.classList.toggle('btn-outline-success', !on);
+    });
+    document.querySelectorAll('[data-tipos]').forEach(g => g.classList.toggle('d-none', g.dataset.tipos.split(' ').indexOf(tipoActual) === -1));
+    $('repDescTipo').textContent = btn.dataset.desc || '';
+    $('repBadge').textContent = 'Filtro: ' + btn.dataset.titulo;
+  }
+
+  /** Destruye todas las DataTables del contenedor antes de volver a pintar. */
+  function limpiarTablas() {
     const cont = $('repContenedor');
+    if (window.jQuery && $.fn.DataTable) {
+      window.jQuery(cont).find('table').each(function () {
+        if ($.fn.DataTable.isDataTable(this)) window.jQuery(this).DataTable().destroy();
+      });
+    }
     cont.innerHTML = '';
-    r.tablas.forEach(function (t, k) {
+  }
+
+  function pintarTablas(r) {
+    //limpiarTablas();
+    const cont = $('repContenedor');
+
+    r.tablas.forEach(function (t) {
+      const id = 'tablaRep' + (++tablaSeq);
       const wrap = document.createElement('div');
       wrap.className = 'px-0 mb-4';
-      const id = 'tablaRep' + k;
       const pie = t.pie ? '<tfoot><tr>' + t.cols.map(function (c, i) {
         const v = t.pie[i];
         const txt = v === null || v === undefined ? '' : (c[1] === 'monto' ? num(v, 2) : c[1] === 'entero' ? num(v, 0) : esc(v));
@@ -182,8 +216,9 @@ $tarjetas = [
       cont.appendChild(wrap);
 
       const n = t.cols.length;
-      inicializarDataTable('#' + id, {
-        ordering: false, paging: false, searching: false, info: false, dom: 't',
+      const grande = t.filas.length > 10;
+      const base = {
+        ordering: false,
         data: t.filas.map(f => f.slice()),
         language: { emptyTable: 'Sin registros' },
         columns: t.cols.map(function (c, i) {
@@ -191,20 +226,24 @@ $tarjetas = [
                    className: (i === 0 ? 'ps-4 ' : '') + (c[1] === 'texto' ? '' : 'text-end'),
                    responsivePriority: i === 0 ? 1 : (i === n - 1 ? 2 : 3 + i) };
         })
-      });
+      };
+      // Tablas largas: DataTable completo del script general. Cortas: solo la tabla.
+      inicializarDataTable('#' + id, Object.assign(base, grande
+        ? { placeholder: 'Buscar en el reporte...', pageLength: 10 }
+        : { paging: false, searching: false, info: false, dom: 't' }));
     });
   }
 
-  function setCargando(v) { generando = v; ['btnGenerar', 'btnImprimir', 'btnExcel'].forEach(id => $(id).disabled = v); }
-
   function generar() {
-    if (generando || !valido()) return;
-    setCargando(true);
+    if (!valido()) return;
+    const mio = ++reqId;
+    //limpiarTablas();
     $('repContenedor').innerHTML = '<div class="text-center text-xs text-secondary py-5">Generando informe...</div>';
 
     fetch(baseUrl + '/reportes/datos?' + qs() + '&_=' + Date.now(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
       .then(r => r.json())
       .then(function (res) {
+        if (mio !== reqId) return; // llegó una respuesta más nueva
         if (!res.success) {
           $('repContenedor').innerHTML = '<div class="text-center text-xs text-danger py-5">' + esc(res.message) + '</div>';
           Swal.fire('No se pudo generar', res.message, 'error');
@@ -212,39 +251,36 @@ $tarjetas = [
         }
         const r = res.reporte;
         $('repTitulo').textContent = r.titulo;
-        $('repSub').textContent = $('fSucursal').options[$('fSucursal').selectedIndex].text;
+        $('repSub').textContent = $('fSucursal').options[$('fSucursal').selectedIndex].text + ' · ' + r.periodo;
         $('repSaldo').textContent = r.saldo_label + ': ' + bs(r.saldo);
+        $('kIni').textContent = bs(r.kpi.inicial);
         $('kIng').textContent = bs(r.kpi.ing);
-        $('kEgr').textContent = bs(r.kpi.egr);
-        $('kPre').textContent = bs(r.kpi.pre);
+        $('kEgr').textContent = bs((parseFloat(r.kpi.egr) || 0) + (parseFloat(r.kpi.pre) || 0));
         $('kSal').textContent = bs(r.kpi.saldo);
         pintarTablas(r);
       })
       .catch(function () {
+        if (mio !== reqId) return;
         $('repContenedor').innerHTML = '<div class="text-center text-xs text-danger py-5">Ocurrió un error en el servidor.</div>';
         Swal.fire('Error', 'Ocurrió un error en el servidor', 'error');
-      })
-      .then(() => setCargando(false));
+      });
   }
 
   $('tiposReporte').addEventListener('click', function (e) {
     const b = e.target.closest('[data-tipo]');
-    if (!b) return;
-    tipo = b.dataset.tipo;
-    this.querySelectorAll('[data-tipo]').forEach(function (x) {
-      const on = x === b;
-      x.classList.toggle('bg-gradient-success', on); x.classList.toggle('text-white', on); x.classList.toggle('btn-outline-success', !on);
-    });
-    document.querySelectorAll('[data-grupo]').forEach(g => g.classList.toggle('d-none', g.dataset.grupo !== tipo));
-    $('lblSaldo').textContent = tipo === 'detalle' ? 'Saldo inicial al 1.º de enero (Bs.)' : 'Saldo inicial al primer mes (Bs.)';
+    if (!b || b.dataset.tipo === tipoActual) return;
+    aplicarTipo(b);
     generar();
   });
 
   $('btnGenerar').addEventListener('click', generar);
-  ['fDesde', 'fHasta', 'fMes', 'fSucursal'].forEach(id => $(id).addEventListener('change', generar));
+  ['fMes', 'fAnio', 'fDesde', 'fHasta', 'fSucursal'].forEach(id => $(id).addEventListener('change', generar));
   $('btnImprimir').addEventListener('click', function () { if (valido()) lanzarImpresionIframe(baseUrl + '/reportes/imprimir?' + qs()); });
   $('btnExcel').addEventListener('click', function () { if (valido()) window.location.href = baseUrl + '/reportes/exportar?' + qs(); });
 
-  document.addEventListener('DOMContentLoaded', generar);
+  document.addEventListener('DOMContentLoaded', function () {
+    aplicarTipo(document.querySelector('#tiposReporte [data-tipo="consolidado"]'));
+    generar();
+  });
 })();
 </script>

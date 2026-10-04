@@ -21,12 +21,14 @@ class Reportes_controller {
 
     public function index() {
         $this->acceso('vista');
-        $this->vista('reportes/index', [
+               $this->vista('reportes/index', [
             'tipos'      => ValidarReportes::TIPOS,
             'sucursales' => $this->sucursalesPermitidas(),
             'veTodas'    => $this->veTodas(),
             'mesActual'  => date('Y-m'),
-            'mesInicio'  => date('Y-01'),
+            'anioActual' => date('Y'),
+            'hoy'        => date('Y-m-d'),
+            'inicioMes'  => date('Y-m-01'),
         ]);
     }
 
@@ -50,7 +52,7 @@ class Reportes_controller {
         $d = $this->datosDocumento();
         $r = $d['r'];
         $e = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
-        $nombre = 'reporte_' . $d['f']['tipo'] . '_' . $d['f']['meses'][0] . '_' . end($d['f']['meses']) . '.xls';
+        $nombre = 'reporte_' . $d['f']['tipo'] . '_' . $d['f']['ini'] . '_' . $d['f']['fin'] . '.xls';
 
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/vnd.ms-excel; charset=utf-8');
@@ -119,7 +121,8 @@ class Reportes_controller {
     private function filtros() {
         $permitidas = $this->sucursalesPermitidas();
         $ids = array_map('intval', array_column($permitidas, 'id_sucursal'));
-        $f = ValidarReportes::normalizar($_GET, $ids);
+        $primer = (($_GET['tipo'] ?? '') === 'consolidado') ? $this->model->primerMes($ids) : null;
+        $f = ValidarReportes::normalizar($_GET, $ids, $primer);
         return [$f, ValidarReportes::validar($f), $permitidas];
     }
 
