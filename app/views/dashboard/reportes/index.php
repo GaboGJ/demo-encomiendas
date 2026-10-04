@@ -4,95 +4,70 @@
  * Variables: $tipos, $sucursales, $veTodas, $mesActual, $anioActual, $hoy, $inicioMes
  */
 $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
-$tarjetas = [
-  ['kIni', 'Saldo Inicial / Vienen',  'account_balance_wallet', 'bg-gradient-dark',    'shadow-dark',    'text-dark'],
-  ['kIng', 'Ingresos Totales',        'payments',               'bg-gradient-success', 'shadow-success', 'text-success'],
-  ['kEgr', 'Egresos y Préstamos',     'trending_down',          'bg-gradient-info',    'shadow-info',    'text-danger'],
-  ['kSal', 'Saldo Final',             'savings',                'bg-gradient-success', 'shadow-success', 'text-success'],
-];
 ?>
-<style>
-  .rep-tabla thead th { text-transform: uppercase; font-size: .65rem; font-weight: 700; color: #8392ab; white-space: nowrap;
-                        padding: .75rem .6rem; border-top: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5; }
-  .rep-tabla tbody td { padding: .6rem; vertical-align: middle; }
-  .rep-tabla tfoot td { padding: .7rem .6rem; font-weight: 800; background: #e8f5e9; font-size: .8rem; }
-  .rep-saldo { font-size: .8rem; font-weight: 800; color: #344767; }
-  .rep-tipos { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 0; }
-  .rep-tipos .btn { white-space: nowrap; flex-shrink: 0; margin-bottom: 0; border-radius: 0; }
-  .rep-tipos .btn:first-child { border-radius: .5rem 0 0 .5rem; }
-  .rep-tipos .btn:last-child  { border-radius: 0 .5rem .5rem 0; }
-  .rep-tipos .btn + .btn { margin-left: -1px; }
-</style>
-
 <div class="container-fluid py-3 flex-grow-1">
 
-  <!-- TARJETAS DE MÉTRICAS (se actualizan al generar) -->
-  <div class="row mb-4">
-    <?php foreach ($tarjetas as $i => $t): ?>
-      <div class="col-xl-3 col-sm-6 <?= $i < 3 ? 'mb-xl-0 mb-4' : '' ?>">
-        <div class="card border-0 shadow-sm border-radius-xl"><div class="card-body p-3"><div class="row">
-          <div class="col-8"><div class="numbers">
-            <p class="text-xs text-secondary mb-0 font-weight-bold"><?= $t[1] ?></p>
-            <h5 class="font-weight-bolder <?= $t[5] ?> mb-0" id="<?= $t[0] ?>">-</h5>
-          </div></div>
-          <div class="col-4 text-end"><div class="icon icon-shape <?= $t[3] ?> <?= $t[4] ?> text-center border-radius-md">
-            <i class="material-symbols-rounded opacity-10"><?= $t[2] ?></i>
-          </div></div>
-        </div></div></div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-  <!-- FILTROS -->
-  <div class="row mb-4"><div class="col-12">
-    <div class="card border-0 shadow-sm border-radius-xl p-3 p-md-4">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+  <!-- Filtros -->
+  <div class="card border-0 shadow-sm border-radius-xl mb-4">
+    <div class="card-body p-3 p-md-4">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
         <div>
-          <h5 class="font-weight-bolder text-dark mb-1">Generador de Informes Económicos</h5>
-          <p class="text-xs text-secondary mb-0" id="repDescTipo">Control financiero por periodo.</p>
+          <h5 class="font-weight-bolder text-dark mb-1">Informes económicos</h5>
+          <p class="text-xs text-secondary mb-0" id="repDescTipo">&nbsp;</p>
         </div>
-        <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-sm btn-outline-secondary mb-0 d-inline-flex align-items-center gap-1" id="btnImprimir">
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary mb-0 d-inline-flex align-items-center justify-content-center gap-1 flex-fill" id="btnImprimir">
             <i class="material-symbols-rounded text-sm">print</i> Imprimir
           </button>
-          <button type="button" class="btn btn-sm bg-gradient-success text-white mb-0 d-inline-flex align-items-center gap-1" id="btnExcel">
-            <i class="material-symbols-rounded text-sm">download</i> Exportar Excel
+          <button type="button" class="btn btn-sm bg-gradient-success text-white mb-0 d-inline-flex align-items-center justify-content-center gap-1 flex-fill" id="btnExcel">
+            <i class="material-symbols-rounded text-sm">download</i> Excel
           </button>
         </div>
       </div>
 
-      <!-- TIPO DE REPORTE: botones agrupados -->
-      <label class="form-label text-xs font-weight-bold text-dark mb-1">Tipo de Reporte</label>
-      <div class="rep-tipos mb-3" id="tiposReporte" role="group">
+      <!-- Tipo de reporte: cuadrícula responsive -->
+      <label class="form-label text-xs font-weight-bold text-dark mb-2 d-block">Tipo de reporte</label>
+      <div class="row g-2 mb-4" id="tiposReporte">
         <?php foreach ($tipos as $k => $t): ?>
-          <button type="button"
-                  class="btn btn-sm d-inline-flex align-items-center gap-1 <?= $k === 'consolidado' ? 'bg-gradient-success text-white' : 'btn-outline-success' ?>"
-                  data-tipo="<?= $h($k) ?>" data-desc="<?= $h($t['desc']) ?>" data-titulo="<?= $h($t['titulo']) ?>">
-            <i class="material-symbols-rounded text-sm"><?= $h($t['icono']) ?></i> <?= $h($t['titulo']) ?>
-          </button>
+          <div class="col-4 col-md-2">
+            <button type="button"
+                    class="btn btn-sm w-100 mb-0 py-2 px-1 d-flex flex-column flex-xl-row align-items-center justify-content-center gap-1 text-xs <?= $k === 'consolidado' ? 'bg-gradient-success text-white' : 'btn-outline-success' ?>"
+                    data-tipo="<?= $h($k) ?>" data-desc="<?= $h($t['desc']) ?>" data-titulo="<?= $h($t['titulo']) ?>">
+              <i class="material-symbols-rounded text-lg"><?= $h($t['icono']) ?></i>
+              <span class="text-center lh-1"><?= $h($t['titulo']) ?></span>
+            </button>
+          </div>
         <?php endforeach; ?>
       </div>
 
       <div class="row g-3 align-items-end">
-        <div class="col-6 col-md-3 d-none" data-tipos="diario semanal mensual">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Mes</label>
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="diario">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Día</label>
+          <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fDia" value="<?= $h($hoy) ?>"></div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="semanal mensual">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Mes</label>
           <div class="input-group input-group-outline is-filled"><input type="month" class="form-control" id="fMes" value="<?= $h($mesActual) ?>"></div>
         </div>
-        <div class="col-6 col-md-3 d-none" data-tipos="anual">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Gestión (año)</label>
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="semanal">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Semana</label>
+          <div class="input-group input-group-outline is-filled"><select class="form-control" id="fSemana"></select></div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="anual">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Gestión (año)</label>
           <div class="input-group input-group-outline is-filled"><input type="number" min="2000" max="2100" step="1" class="form-control" id="fAnio" value="<?= $h($anioActual) ?>"></div>
         </div>
-        <div class="col-6 col-md-3 d-none" data-tipos="rango">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Fecha inicio</label>
+        <div class="col-12 col-sm-6 col-xl-3 d-none" data-tipos="rango">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Desde</label>
           <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fDesde" value="<?= $h($inicioMes) ?>"></div>
         </div>
-        <div class="col-6 col-md-3 d-none" data-tipos="rango">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Fecha fin</label>
+        <div class="col-12 col-sm-6 col-xl-3 d-none" data-tipos="rango">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Hasta</label>
           <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fHasta" value="<?= $h($hoy) ?>"></div>
         </div>
 
-        <div class="col-12 col-md-6 col-lg-4">
-          <label class="form-label text-xs font-weight-bold text-dark mb-0">Sucursal</label>
+        <div class="col-12 col-md-6 col-xl-4">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Sucursal</label>
           <div class="input-group input-group-outline is-filled">
             <select class="form-control" id="fSucursal" <?= (!$veTodas || count($sucursales) <= 1) ? 'disabled' : '' ?>>
               <?php if ($veTodas && count($sucursales) > 1): ?><option value="0">Todas las sucursales</option><?php endif; ?>
@@ -102,74 +77,80 @@ $tarjetas = [
             </select>
           </div>
         </div>
-        <div class="col-12 col-md-4 col-lg-2">
-          <button type="button" class="btn btn-sm bg-gradient-dark w-100 mb-0 d-inline-flex align-items-center justify-content-center gap-1" id="btnGenerar">
+        <div class="col-12 col-md-6 col-xl-auto ms-xl-auto">
+          <button type="button" class="btn bg-gradient-dark w-100 mb-0 d-inline-flex align-items-center justify-content-center gap-1" id="btnGenerar">
             <i class="material-symbols-rounded text-sm">filter_alt</i> Aplicar
           </button>
         </div>
       </div>
     </div>
-  </div></div>
+  </div>
 
-  <!-- RESULTADO -->
-  <div class="row"><div class="col-12">
-    <div class="card border-0 shadow-sm border-radius-xl overflow-hidden mb-4">
-      <div class="card-header bg-white p-3 p-md-4 d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
-        <div>
-          <h6 class="font-weight-bolder text-dark mb-0" id="repTitulo">Informe</h6>
-          <p class="text-xxs text-secondary mb-1" id="repSub">&nbsp;</p>
-          <span class="rep-saldo" id="repSaldo"></span>
-        </div>
-        <span class="badge bg-gradient-success text-xxs px-2 py-1" id="repBadge">Filtro: Consolidado</span>
-      </div>
-      <hr class="horizontal dark my-0 opacity-2">
-      <div class="card-body px-0 pt-3 pb-2" id="repContenedor">
-        <div class="text-center text-xs text-secondary py-5">Cargando informe...</div>
-      </div>
+  <!-- Encabezado del resultado -->
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 px-1 mb-3">
+    <div>
+      <h6 class="font-weight-bolder text-dark mb-1" id="repTitulo">Informe</h6>
+      <p class="text-xs text-secondary mb-0" id="repSub">&nbsp;</p>
     </div>
-  </div></div>
+    <span class="badge bg-gradient-success px-3 py-2" id="repBadge">General</span>
+  </div>
+
+  <!-- Resultado -->
+  <div id="repContenedor">
+    <div class="text-center text-xs text-secondary py-5">Cargando informe...</div>
+  </div>
 </div>
 
 <script>
 (function () {
   const baseUrl = '<?= rtrim(URL, "/") ?>';
+  const MES_ACTUAL = '<?= $h($mesActual) ?>';
   const $ = id => document.getElementById(id);
   const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
   const num = (n, dec) => (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   const bs = n => 'Bs. ' + num(n, 2);
+  const pad = n => String(n).padStart(2, '0');
+  const DETALLE = ['diario', 'semanal', 'mensual'];
 
   let tipoActual = 'consolidado';
-  let reqId = 0;      // solo la respuesta de la última petición se pinta
-  let tablaSeq = 0;   // ids únicos de tabla en cada generación
+  let reqId = 0;
+  let chart = null;
 
-  function celda(tipoCol) {
-    return function (d, type) {
-      if (type !== 'display') return d == null ? '' : d;
-      if (d === null || d === '') return '';
-      const t = tipoCol === 'monto' ? num(d, 2) : tipoCol === 'entero' ? num(d, 0) : esc(d);
-      return '<span class="text-xs font-weight-bold text-dark">' + t + '</span>';
-    };
+  /* ---------- Semanas según el mes ---------- */
+  function cargarSemanas() {
+    const v = $('fMes').value, sel = $('fSemana');
+    if (!v) { sel.innerHTML = ''; return; }
+    const prev = sel.value;
+    const p = v.split('-').map(Number), dim = new Date(p[0], p[1], 0).getDate();
+    let html = '';
+    for (let s = 1, n = 1; s <= dim; s += 7, n++) {
+      html += '<option value="' + n + '">Semana ' + n + ' (' + pad(s) + ' al ' + pad(Math.min(s + 6, dim)) + ')</option>';
+    }
+    sel.innerHTML = html;
+    if (prev && sel.querySelector('option[value="' + prev + '"]')) sel.value = prev;
+    else sel.value = (v === MES_ACTUAL) ? Math.ceil(new Date().getDate() / 7) : 1;
   }
 
+  /* ---------- Filtros ---------- */
   function qs() {
     return new URLSearchParams({
-      tipo: tipoActual, mes: $('fMes').value, anio: $('fAnio').value,
-      desde: $('fDesde').value, hasta: $('fHasta').value,
+      tipo: tipoActual, dia: $('fDia').value, mes: $('fMes').value, semana: $('fSemana').value,
+      anio: $('fAnio').value, desde: $('fDesde').value, hasta: $('fHasta').value,
       sucursal: $('fSucursal').value || 0
     }).toString();
   }
 
   function valido() {
-    const t = tipoActual;
-    if (['diario', 'semanal', 'mensual'].indexOf(t) !== -1 && !$('fMes').value) {
-      Swal.fire({ icon: 'warning', title: 'Falta el mes', text: 'Seleccione el mes del informe.' }); return false;
-    }
+    const t = tipoActual, aviso = (ti, tx) => { Swal.fire({ icon: 'warning', title: ti, text: tx }); return false; };
+    if (t === 'diario' && !$('fDia').value) return aviso('Falta el día', 'Seleccione el día del informe.');
+    if (t === 'semanal' && (!$('fMes').value || !$('fSemana').value)) return aviso('Falta la semana', 'Seleccione el mes y la semana.');
+    if (t === 'mensual' && !$('fMes').value) return aviso('Falta el mes', 'Seleccione el mes del informe.');
     if (t === 'anual') {
       const a = parseInt($('fAnio').value);
-      if (!a || a < 2000 || a > 2100) { Swal.fire({ icon: 'warning', title: 'Año inválido', text: 'Indique un año entre 2000 y 2100.' }); return false; }
+      if (!a || a < 2000 || a > 2100) return aviso('Año inválido', 'Indique un año entre 2000 y 2100.');
     }
     if (t === 'rango' && (!$('fDesde').value || !$('fHasta').value || $('fDesde').value > $('fHasta').value)) {
-      Swal.fire({ icon: 'warning', title: 'Rango inválido', text: 'Indique fecha de inicio y fin (inicio no mayor al fin).' }); return false;
+      return aviso('Rango inválido', 'Indique fecha de inicio y fin (inicio no mayor al fin).');
     }
     return true;
   }
@@ -184,66 +165,153 @@ $tarjetas = [
     });
     document.querySelectorAll('[data-tipos]').forEach(g => g.classList.toggle('d-none', g.dataset.tipos.split(' ').indexOf(tipoActual) === -1));
     $('repDescTipo').textContent = btn.dataset.desc || '';
-    $('repBadge').textContent = 'Filtro: ' + btn.dataset.titulo;
+    $('repBadge').textContent = btn.dataset.titulo;
   }
 
-  /** Destruye todas las DataTables del contenedor antes de volver a pintar. */
-  function limpiarTablas() {
+  /* ---------- Componentes ---------- */
+  function card(inner, extra) {
+    return '<div class="card border-0 shadow-sm border-radius-xl ' + (extra || '') + '">' + inner + '</div>';
+  }
+
+  /** Resumen del periodo (siempre primero) */
+  function resumen(k) {
+    const ini = parseFloat(k.inicial) || 0, ing = parseFloat(k.ing) || 0;
+    const items = [
+      //['Vienen', 'Saldo del periodo anterior', ini, 'text-dark', 'account_balance_wallet', 'bg-gradient-dark'],
+      ['Ingresos', 'Pasajes, encomiendas y otros', ing, 'text-success', 'payments', 'bg-gradient-success'],
+      //['Disponible', 'Vienen + Ingresos', ini + ing, 'text-dark', 'add_card', 'bg-gradient-info'],
+      ['Egresos', 'Gastos del periodo', k.egr, 'text-danger', 'trending_down', 'bg-gradient-danger'],
+      //['Préstamos', 'Préstamos entregados', k.pre, 'text-danger', 'handshake', 'bg-gradient-warning'],
+      ['Saldo final', 'Disponible − egresos − préstamos', k.saldo, 'text-success', 'savings', 'bg-gradient-success']
+    ];
+    return '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Resumen del periodo</h6>' +
+      '<div class="row g-3 mb-4">' + items.map(function (i) {
+        return '<div class="col-12 col-sm-6 col-xl-4">' + card(
+          '<div class="card-body p-3 p-md-4 d-flex align-items-center justify-content-between gap-3">' +
+            '<div class="min-width-0">' +
+              '<p class="text-xs text-secondary font-weight-bold mb-0">' + i[0] + '</p>' +
+              '<h5 class="font-weight-bolder ' + i[3] + ' mb-0 text-break">' + bs(i[2]) + '</h5>' +
+              '<p class="text-xxs text-secondary mb-0">' + i[1] + '</p>' +
+            '</div>' +
+            '<div class="icon icon-md icon-shape ' + i[5] + ' text-center border-radius-md flex-shrink-0 d-flex align-items-center justify-content-center">' +
+              '<i class="material-symbols-rounded text-white">' + i[4] + '</i></div>' +
+          '</div>', 'h-100') + '</div>';
+      }).join('') + '</div>';
+  }
+
+  /** Tarjetas por periodo (mes o día) en cuadrícula */
+  function periodos(t) {
+    const grande = t.filas.length > 12;
+    const items = t.filas.map(function (f) {
+      const gasto = (parseFloat(f[4]) || 0) + (parseFloat(f[5]) || 0);
+      const neg = parseFloat(f[6]) < 0;
+      return '<div class="col-12 col-sm-6 col-xl-4">' + card(
+        '<div class="card-body p-3">' +
+          '<div class="d-flex justify-content-between align-items-center mb-3 gap-2">' +
+            '<h6 class="text-sm font-weight-bold text-dark mb-0">' + esc(f[0]) + '</h6>' +
+            '<span class="badge badge-sm ' + (neg ? 'bg-gradient-danger' : 'bg-gradient-success') + '">' + num(f[6], 2) + '</span>' +
+          '</div>' +
+          '<div class="row g-2 text-center">' +
+            '<div class="col-4"><span class="d-block text-xxs text-secondary">Ingresos</span><span class="text-xs font-weight-bolder text-success">' + num(f[1], 2) + '</span></div>' +
+            '<div class="col-4"><span class="d-block text-xxs text-secondary">Vienen</span><span class="text-xs font-weight-bolder text-dark">' + num(f[2], 2) + '</span></div>' +
+            '<div class="col-4"><span class="d-block text-xxs text-secondary">Egresos</span><span class="text-xs font-weight-bolder text-danger">' + num(gasto, 2) + '</span></div>' +
+          '</div>' +
+        '</div>', 'h-100 border') + '</div>';
+    }).join('');
+
+    return '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Detalle por periodo</h6>' +
+      '<div class="' + (grande ? 'overflow-auto pe-1' : '') + '"' + (grande ? ' style="max-height:560px"' : '') + '>' +
+      '<div class="row g-3">' + (items || '<div class="col-12 text-center text-xs text-secondary py-4">Sin registros</div>') + '</div></div>';
+  }
+
+  /** Bloque de detalle: filas con nombre y montos etiquetados (se adaptan a cualquier ancho) */
+  function bloque(t) {
+    const cols = t.cols;
+    const val = (c, v) => c[1] === 'monto' ? num(v, 2) : c[1] === 'entero' ? num(v, 0) : esc(v);
+    const color = c => {
+      const l = c[0].toLowerCase();
+      return (l.indexOf('egreso') > -1 || l.indexOf('préstamo') > -1) ? 'text-danger' : (l.indexOf('ingreso') > -1 ? 'text-success' : 'text-dark');
+    };
+    const montos = (fila, esPie) => cols.slice(1).map(function (c, j) {
+      const v = fila[j + 1];
+      if (v === null || v === undefined || v === '') return '';
+      return '<div class="text-end"><span class="d-block text-xxs text-secondary">' + esc(c[0]) + '</span>' +
+             '<span class="text-sm font-weight-bold ' + (esPie ? 'text-dark' : color(c)) + '">' + val(c, v) + '</span></div>';
+    }).join('');
+
+    const filas = t.filas.map(function (f) {
+      return '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-bottom border-light">' +
+        '<span class="text-sm font-weight-bold text-dark text-wrap">' + esc(f[0]) + '</span>' +
+        '<div class="d-flex flex-wrap justify-content-end gap-3 ms-auto">' + montos(f, false) + '</div></div>';
+    }).join('');
+
+    const pie = t.pie ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 bg-gray-100">' +
+      '<span class="text-sm font-weight-bolder text-dark">' + esc(t.pie[0]) + '</span>' +
+      '<div class="d-flex flex-wrap justify-content-end gap-3 ms-auto">' + montos(t.pie, true) + '</div></div>' : '';
+
+    const cuerpo = t.filas.length > 10 ? '<div class="overflow-auto" style="max-height:400px">' + filas + '</div>' : filas;
+
+    return card(
+      '<div class="px-3 pt-3 pb-2"><h6 class="text-xs font-weight-bolder text-uppercase text-success mb-0">' + esc(t.titulo || 'Detalle') + '</h6></div>' +
+      (cuerpo || '<div class="text-center text-xs text-secondary py-4">Sin registros</div>') + pie,
+      'h-100 overflow-hidden');
+  }
+
+  function pintar(r) {
     const cont = $('repContenedor');
-    if (window.jQuery && $.fn.DataTable) {
-      window.jQuery(cont).find('table').each(function () {
-        if ($.fn.DataTable.isDataTable(this)) window.jQuery(this).DataTable().destroy();
+    if (chart) { chart.destroy(); chart = null; }
+    const detalle = DETALLE.indexOf(r.tipo) !== -1;
+    let html = resumen(r.kpi);
+
+    if (detalle) {
+      const det = r.tablas.filter(t => t.titulo !== 'RESUMEN DEL PERIODO');
+      if (det.length) {
+        html += '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Detalle</h6>' +
+          '<div class="row g-3">' + det.map(t => '<div class="col-12 col-xl-6">' + bloque(t) + '</div>').join('') + '</div>';
+      }
+    } else {
+      const t0 = r.tablas[0];
+      if (t0.filas.length > 1) {
+        html += card('<div class="card-body p-3 p-md-4">' +
+          '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3">Ingresos vs egresos</h6>' +
+          '<div class="chart"><canvas id="repChart" class="chart-canvas" height="220"></canvas></div></div>', 'mb-4');
+      }
+      html += periodos(t0);
+    }
+    cont.innerHTML = html;
+
+    const cv = $('repChart');
+    if (cv && typeof Chart !== 'undefined') {
+      const f = r.tablas[0].filas;
+      chart = new Chart(cv.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: f.map(x => x[0]),
+          datasets: [
+            { label: 'Ingresos', backgroundColor: '#4CAF50', borderRadius: 4, data: f.map(x => x[1]) },
+            { label: 'Egresos y préstamos', backgroundColor: '#F44335', borderRadius: 4, data: f.map(x => (+x[4] || 0) + (+x[5] || 0)) },
+            { type: 'line', label: 'Saldo final', borderColor: '#344767', borderWidth: 2, pointRadius: 2, tension: 0.3, data: f.map(x => x[6]) }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+          scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 60 } }, y: { grid: { color: '#e5e5e5' }, ticks: { font: { size: 10 } } } }
+        }
       });
     }
-    cont.innerHTML = '';
-  }
-
-  function pintarTablas(r) {
-    //limpiarTablas();
-    const cont = $('repContenedor');
-
-    r.tablas.forEach(function (t) {
-      const id = 'tablaRep' + (++tablaSeq);
-      const wrap = document.createElement('div');
-      wrap.className = 'px-0 mb-4';
-      const pie = t.pie ? '<tfoot><tr>' + t.cols.map(function (c, i) {
-        const v = t.pie[i];
-        const txt = v === null || v === undefined ? '' : (c[1] === 'monto' ? num(v, 2) : c[1] === 'entero' ? num(v, 0) : esc(v));
-        return '<td class="' + (i === 0 ? 'ps-4' : (c[1] === 'texto' ? '' : 'text-end')) + '">' + txt + '</td>';
-      }).join('') + '</tr></tfoot>' : '';
-      wrap.innerHTML = (t.titulo ? '<h6 class="text-xs font-weight-bolder text-uppercase text-success px-4 mb-2">' + esc(t.titulo) + '</h6>' : '') +
-        '<div class="table-responsive p-0"><table id="' + id + '" class="table table-borderless align-items-center mb-0 w-100 rep-tabla">' + pie + '</table></div>';
-      cont.appendChild(wrap);
-
-      const n = t.cols.length;
-      const grande = t.filas.length > 10;
-      const base = {
-        ordering: false,
-        data: t.filas.map(f => f.slice()),
-        language: { emptyTable: 'Sin registros' },
-        columns: t.cols.map(function (c, i) {
-          return { title: c[0], render: celda(c[1]), data: i,
-                   className: (i === 0 ? 'ps-4 ' : '') + (c[1] === 'texto' ? '' : 'text-end'),
-                   responsivePriority: i === 0 ? 1 : (i === n - 1 ? 2 : 3 + i) };
-        })
-      };
-      // Tablas largas: DataTable completo del script general. Cortas: solo la tabla.
-      inicializarDataTable('#' + id, Object.assign(base, grande
-        ? { placeholder: 'Buscar en el reporte...', pageLength: 10 }
-        : { paging: false, searching: false, info: false, dom: 't' }));
-    });
   }
 
   function generar() {
     if (!valido()) return;
     const mio = ++reqId;
-    //limpiarTablas();
+    if (chart) { chart.destroy(); chart = null; }
     $('repContenedor').innerHTML = '<div class="text-center text-xs text-secondary py-5">Generando informe...</div>';
 
     fetch(baseUrl + '/reportes/datos?' + qs() + '&_=' + Date.now(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
       .then(r => r.json())
       .then(function (res) {
-        if (mio !== reqId) return; // llegó una respuesta más nueva
+        if (mio !== reqId) return;
         if (!res.success) {
           $('repContenedor').innerHTML = '<div class="text-center text-xs text-danger py-5">' + esc(res.message) + '</div>';
           Swal.fire('No se pudo generar', res.message, 'error');
@@ -252,12 +320,7 @@ $tarjetas = [
         const r = res.reporte;
         $('repTitulo').textContent = r.titulo;
         $('repSub').textContent = $('fSucursal').options[$('fSucursal').selectedIndex].text + ' · ' + r.periodo;
-        $('repSaldo').textContent = r.saldo_label + ': ' + bs(r.saldo);
-        $('kIni').textContent = bs(r.kpi.inicial);
-        $('kIng').textContent = bs(r.kpi.ing);
-        $('kEgr').textContent = bs((parseFloat(r.kpi.egr) || 0) + (parseFloat(r.kpi.pre) || 0));
-        $('kSal').textContent = bs(r.kpi.saldo);
-        pintarTablas(r);
+        pintar(r);
       })
       .catch(function () {
         if (mio !== reqId) return;
@@ -266,6 +329,7 @@ $tarjetas = [
       });
   }
 
+  /* ---------- Eventos ---------- */
   $('tiposReporte').addEventListener('click', function (e) {
     const b = e.target.closest('[data-tipo]');
     if (!b || b.dataset.tipo === tipoActual) return;
@@ -273,12 +337,14 @@ $tarjetas = [
     generar();
   });
 
+  $('fMes').addEventListener('change', cargarSemanas);
   $('btnGenerar').addEventListener('click', generar);
-  ['fMes', 'fAnio', 'fDesde', 'fHasta', 'fSucursal'].forEach(id => $(id).addEventListener('change', generar));
+  ['fDia', 'fMes', 'fSemana', 'fAnio', 'fDesde', 'fHasta', 'fSucursal'].forEach(id => $(id).addEventListener('change', generar));
   $('btnImprimir').addEventListener('click', function () { if (valido()) lanzarImpresionIframe(baseUrl + '/reportes/imprimir?' + qs()); });
   $('btnExcel').addEventListener('click', function () { if (valido()) window.location.href = baseUrl + '/reportes/exportar?' + qs(); });
 
   document.addEventListener('DOMContentLoaded', function () {
+    cargarSemanas();
     aplicarTipo(document.querySelector('#tiposReporte [data-tipo="consolidado"]'));
     generar();
   });

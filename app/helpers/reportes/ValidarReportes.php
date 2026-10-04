@@ -4,8 +4,16 @@
  * Filtros, validación y formato del módulo Reportes (plantillas económicas del sindicato).
  * Tipos: consolidado | diario | semanal | mensual | anual | rango
  *
- * normalizar() construye $f['buckets']: lista de periodos [key,label,desde,hasta] (una fila de la
- * tabla por periodo). $f['fmt'] = 'm' (se consulta agrupado por mes) o 'd' (por día).
+ *  - consolidado : un mes por fila.
+ *  - diario      : UN día específico (param "dia").
+ *  - semanal     : UNA semana de un mes (params "mes" + "semana" 1..5).
+ *  - mensual     : UN mes específico (param "mes").
+ *  - anual       : los 12 meses de un año (param "anio").
+ *  - rango       : un día por fila entre "desde" y "hasta".
+ *
+ * normalizar() construye $f['buckets'] (periodos [key,label,desde,hasta]).
+ * $f['detalle'] = true en diario/semanal/mensual (un solo periodo con desglose).
+ * $f['acum_desde'] = fecha desde la que se acumula el saldo "Vienen" (1 de enero) en esos tipos.
  */
 class ValidarReportes {
 
@@ -14,17 +22,17 @@ class ValidarReportes {
     const MAX_NOMBRE = 60;
 
     const TIPOS = [
-        'consolidado' => ['titulo' => 'Informe Consolidado (General)', 'icono' => 'summarize',
+        'consolidado' => ['titulo' => 'General', 'icono' => 'summarize',
                           'desc' => 'Todos los meses registrados, uno por fila.'],
-        'diario'      => ['titulo' => 'Informe Diario', 'icono' => 'today',
-                          'desc' => 'Un día por fila dentro del mes elegido.'],
-        'semanal'     => ['titulo' => 'Informe Semanal', 'icono' => 'date_range',
-                          'desc' => 'Una semana por fila dentro del mes elegido.'],
-        'mensual'     => ['titulo' => 'Informe Mensual Específico', 'icono' => 'receipt_long',
+        'diario'      => ['titulo' => 'Diario', 'icono' => 'today',
+                          'desc' => 'Detalle de un día específico.'],
+        'semanal'     => ['titulo' => 'Semanal', 'icono' => 'date_range',
+                          'desc' => 'Detalle de una semana de un mes.'],
+        'mensual'     => ['titulo' => 'Mensual', 'icono' => 'receipt_long',
                           'desc' => 'Detalle de un mes: ingresos por ruta, egresos, préstamos y saldo.'],
-        'anual'       => ['titulo' => 'Informe Anual', 'icono' => 'calendar_month',
+        'anual'       => ['titulo' => 'Anual', 'icono' => 'calendar_month',
                           'desc' => 'Los 12 meses de la gestión elegida.'],
-        'rango'       => ['titulo' => 'Por Rango de Fecha', 'icono' => 'event_note',
+        'rango'       => ['titulo' => 'Rango de fechas', 'icono' => 'event_note',
                           'desc' => 'Un día por fila entre dos fechas.'],
     ];
 
@@ -118,7 +126,9 @@ class ValidarReportes {
             'parada'     => mb_substr(trim((string)($get['parada'] ?? '')), 0, self::MAX_NOMBRE, 'UTF-8'),
             'fmt'        => 'm',
             'buckets'    => [],
-            'ini' => '', 'fin' => '', 'mes_ini' => '', 'mes_fin' => '', 'anio' => 0,
+            'detalle'    => in_array($tipo, ['diario', 'semanal', 'mensual'], true),
+            'acum_desde' => '',
+            'ini' => '', 'fin' => '', 'anio' => 0,
         ];
 
         $mes = self::ym(trim((string)($get['mes'] ?? '')));
@@ -133,25 +143,30 @@ class ValidarReportes {
                 break;
 
             case 'diario':
-                if ($mes) {
+                $dia = self::fecha(trim((string)($get['dia'] ?? '')));
+                if ($dia) {
                     $f['fmt'] = 'd';
-                    $f['buckets'] = self::bucketsDias($mes, new DateTime($mes->format('Y-m-t')));
+                    $f['buckets'] = self::bucketsDias($dia, $dia);
+                    $f['acum_desde'] = $dia->format('Y-01-01');
                 }
                 break;
 
             case 'semanal':
                 if ($mes) {
-                    $f['fmt'] = 'd';
-                    $f['buckets'] = self::bucketsSemanas($mes);
+                    $n = intval($get['semana'] ?? 0);
+                    $semanas = self::bucketsSemanas($mes);
+                    if ($n >= 1 && isset($semanas[$n - 1])) {
+                        $f['fmt'] = 'd';
+                        $f['buckets'] = [$semanas[$n - 1]];
+                        $f['acum_desde'] = $mes->format('Y-01-01');
+                    }
                 }
                 break;
 
             case 'mensual':
                 if ($mes) {
-                    // La cuenta arranca en enero del año para que "Vienen" sea acumulado
-                    $f['buckets'] = self::bucketsMeses(new DateTime($mes->format('Y-01-01')), $mes);
-                    $f['mes_ini'] = $mes->format('Y-m-01');
-                    $f['mes_fin'] = $mes->format('Y-m-t');
+                    $f['buckets'] = self::bucketsMeses($mes, $mes);
+                    $f['acum_desde'] = $mes->format('Y-01-01');
                 }
                 break;
 
@@ -185,9 +200,11 @@ class ValidarReportes {
 
         if (!$f['buckets']) {
             switch ($f['tipo']) {
-                case 'anual': return 'Indique un año válido (entre 2000 y 2100).';
-                case 'rango': return 'Indique fecha de inicio y de fin válidas (inicio no mayor al fin, máximo ' . self::MAX_DIAS . ' días).';
-                default:      return 'Seleccione el mes del informe.';
+                case 'diario':  return 'Seleccione el día del informe.';
+                case 'semanal': return 'Seleccione el mes y la semana del informe.';
+                case 'anual':   return 'Indique un año válido (entre 2000 y 2100).';
+                case 'rango':   return 'Indique fecha de inicio y de fin válidas (inicio no mayor al fin, máximo ' . self::MAX_DIAS . ' días).';
+                default:        return 'Seleccione el mes del informe.';
             }
         }
         if ($f['saldo'] === null) return 'El saldo inicial no es un número válido.';

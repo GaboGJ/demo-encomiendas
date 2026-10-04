@@ -9,6 +9,9 @@
  * Fuentes de ingresos: pasajes (detalles activos), encomiendas pagadas en origen, cobros COD en
  * destino (entregas_encomiendas) y movimientos de caja tipo ingreso. Egresos y préstamos salen de
  * movimientos_cajas (tipo egreso); es préstamo si el concepto contiene "prestamo/préstamo".
+ *
+ * Tipos "detalle" (diario/semanal/mensual): un solo periodo con desglose; el saldo "Vienen"
+ * se acumula desde el 1 de enero ($f['acum_desde']).
  */
 class Reportes_model {
     private $pdo;
@@ -93,7 +96,7 @@ class Reportes_model {
     /* ---------------- Totales agrupados ---------------- */
 
     /**
-     * Agrupa por mes ('Y-m') o por día ('Y-m-d') según $f['fmt'].
+     * Agrupa por mes ('Y-m') o por día ('Y-m-d') según $f['fmt'], dentro de [$f['ini'], $f['fin']].
      * @return array clave => ['ing'=>,'egr'=>,'pre'=>]
      */
     private function agrupado(array $f) {
@@ -160,10 +163,21 @@ class Reportes_model {
     /* ---------------- Reporte ---------------- */
 
     public function reporte(array $f) {
-        $agr   = $this->agrupado($f);
-        $calc  = [];
+        $agr    = $this->agrupado($f);
         $vienen = (float)$f['saldo'];
 
+        // Tipos de detalle: el saldo "Vienen" acumula lo ocurrido desde el 1 de enero hasta el día anterior
+        if ($f['acum_desde'] !== '' && $f['acum_desde'] < $f['buckets'][0]['desde']) {
+            $ant = (new DateTime($f['buckets'][0]['desde']))->modify('-1 day')->format('Y-m-d');
+            $pre = $this->sumar(
+                $this->agrupado(array_merge($f, ['ini' => $f['acum_desde'], 'fin' => $ant, 'fmt' => 'm'])),
+                '0000-01-01', '9999-12-31'
+            );
+            $vienen = round($vienen + $pre['ing'] - $pre['egr'] - $pre['pre'], 2);
+        }
+        $saldoIni = $vienen;
+
+        $calc = [];
         foreach ($f['buckets'] as $i => $b) {
             $m     = $this->sumar($agr, $b['desde'], $b['hasta']);
             $total = round($m['ing'] + $vienen, 2);
@@ -175,16 +189,11 @@ class Reportes_model {
 
         $r = [
             'tipo'        => $f['tipo'],
-            'saldo'       => (float)$f['saldo'],
+            'saldo'       => $saldoIni,
             'saldo_label' => $this->etiquetaSaldo($f),
         ];
 
-        $ultimo = count($f['buckets']) - 1;
-        if ($f['tipo'] === 'mensual') {
-            $r += $this->armarDetalle($f, $calc[$ultimo], substr($f['buckets'][$ultimo]['desde'], 0, 7));
-        } else {
-            $r += $this->armarTabla($f, $calc);
-        }
+        $r += $f['detalle'] ? $this->armarDetalle($f, $calc[0]) : $this->armarTabla($f, $calc);
         return $r;
     }
 
@@ -197,7 +206,7 @@ class Reportes_model {
         return 'SALDO INICIAL AL ' . date('d/m/Y', strtotime($desde));
     }
 
-    /** Tabla de 7 columnas (la del diseño): una fila por periodo. */
+    /** Tabla de 7 columnas: una fila por periodo (general, anual, rango). */
     private function armarTabla(array $f, array $calc) {
         $filas = []; $si = $se = $sp = 0.0;
         foreach ($f['buckets'] as $i => $b) {
@@ -205,22 +214,15 @@ class Reportes_model {
             $filas[] = [$b['label'], $c['ing'], $c['vienen'], $c['total'], $c['egr'], $c['pre'], $c['saldo']];
             $si += $c['ing']; $se += $c['egr']; $sp += $c['pre'];
         }
-        $ult   = $calc[count($calc) - 1];
-        $b0    = $f['buckets'][0];
-        $bN    = $f['buckets'][count($f['buckets']) - 1];
-        $up    = function ($s) { return mb_strtoupper($s, 'UTF-8'); };
-        $mesTx = $up(ValidarReportes::etiqueta(substr($b0['desde'], 0, 7)));
+        $ult = $calc[count($calc) - 1];
+        $b0  = $f['buckets'][0];
+        $bN  = $f['buckets'][count($f['buckets']) - 1];
+        $up  = function ($s) { return mb_strtoupper($s, 'UTF-8'); };
 
         switch ($f['tipo']) {
             case 'consolidado':
-                $titulo  = 'INFORME ECONÓMICO CONSOLIDADO · ' . $up($b0['label']) . ($b0['key'] === $bN['key'] ? '' : ' A ' . $up($bN['label']));
+                $titulo  = 'INFORME ECONÓMICO GENERAL · ' . $up($b0['label']) . ($b0['key'] === $bN['key'] ? '' : ' A ' . $up($bN['label']));
                 $periodo = $b0['label'] . ($b0['key'] === $bN['key'] ? '' : ' a ' . $bN['label']);
-                break;
-            case 'diario':
-                $titulo = 'INFORME ECONÓMICO DIARIO · ' . $mesTx; $periodo = ValidarReportes::etiqueta(substr($b0['desde'], 0, 7));
-                break;
-            case 'semanal':
-                $titulo = 'INFORME ECONÓMICO SEMANAL · ' . $mesTx; $periodo = ValidarReportes::etiqueta(substr($b0['desde'], 0, 7));
                 break;
             case 'anual':
                 $titulo = 'INFORME ECONÓMICO ANUAL ' . $f['anio']; $periodo = 'Gestión ' . $f['anio'];
@@ -245,9 +247,27 @@ class Reportes_model {
         ];
     }
 
-    /** Informe mensual específico: detalle por ruta, egresos, préstamos y resumen del mes. */
-    private function armarDetalle(array $f, array $c, $ym) {
-        $g = ['sucursales' => $f['sucursales'], 'ini' => $f['mes_ini'], 'fin' => $f['mes_fin']];
+    /** Detalle de UN periodo (día, semana o mes): por ruta, egresos, préstamos y resumen. */
+    private function armarDetalle(array $f, array $c) {
+        $b  = $f['buckets'][0];
+        $g  = ['sucursales' => $f['sucursales'], 'ini' => $b['desde'], 'fin' => $b['hasta']];
+        $ym = substr($b['desde'], 0, 7);
+        $up = function ($s) { return mb_strtoupper($s, 'UTF-8'); };
+
+        switch ($f['tipo']) {
+            case 'diario':
+                $d = date('d/m/Y', strtotime($b['desde']));
+                $titulo = 'INFORME ECONÓMICO DEL DÍA ' . $d; $periodo = $d;
+                break;
+            case 'semanal':
+                $titulo  = 'INFORME ECONÓMICO SEMANAL · ' . $up($b['label']) . ' · ' . $up(ValidarReportes::etiqueta($ym));
+                $periodo = $b['label'] . ' · ' . ValidarReportes::etiqueta($ym);
+                break;
+            default: // mensual
+                $titulo  = 'INFORME ECONÓMICO MES DE ' . $up(ValidarReportes::etiqueta($ym));
+                $periodo = ValidarReportes::etiqueta($ym);
+        }
+
         $num = function ($x) { return [$x[0], (int)$x[1], round((float)$x[2], 2)]; };
         $mapa = function ($rows) use ($num) {
             return array_map(function ($r) use ($num) { return $num([$r['concepto'], $r['cantidad'], $r['monto']]); }, $rows);
@@ -261,6 +281,22 @@ class Reportes_model {
 
         $tablas = [];
 
+        // Movimiento por día (solo semana y mes)
+        if ($f['tipo'] !== 'diario') {
+            $dias = $this->agrupado(array_merge($f, ['ini' => $b['desde'], 'fin' => $b['hasta'], 'fmt' => 'd']));
+            ksort($dias);
+            $filas = []; $ti = $te = $tp = 0.0;
+            foreach ($dias as $k => $v) {
+                $filas[] = [date('d/m/Y', strtotime($k)), round($v['ing'], 2), round($v['egr'], 2), round($v['pre'], 2)];
+                $ti += $v['ing']; $te += $v['egr']; $tp += $v['pre'];
+            }
+            if ($filas) {
+                $tablas[] = ['titulo' => 'MOVIMIENTO POR DÍA',
+                             'cols'   => [['Día', 'texto'], ['Ingresos', 'monto'], ['Egresos', 'monto'], ['Préstamos', 'monto']],
+                             'filas'  => $filas, 'pie' => ['TOTAL', round($ti, 2), round($te, 2), round($tp, 2)]];
+            }
+        }
+
         $p = []; $w = $this->filtro('u.id_sucursal', 'p.create_pasaje', $g, $p);
         $filas = $mapa($this->q("SELECT IF(t.id_turno IS NULL, 'Sin turno (en espera)', CONCAT(so.ciudad_sucursal, ' ➔ ', sd.ciudad_sucursal)) AS concepto,
                                         COUNT(*) AS cantidad, SUM(dp.precio_detalle_pasaje) AS monto
@@ -273,7 +309,7 @@ class Reportes_model {
                                  WHERE (p.estado_pasaje = 1 OR p.estado_pasaje IS NULL)
                                    AND (dp.estado_detalle_pasaje = 1 OR dp.estado_detalle_pasaje IS NULL) AND $w
                                  GROUP BY concepto ORDER BY monto DESC", $p));
-        if ($filas) $tablas[] = $tabla('INGRESOS POR PASAJES (POR RUTA)', $filas, 'Ruta');
+        if ($filas) $tablas[] = $tabla('PASAJES (POR RUTA)', $filas, 'Ruta');
 
         $p = []; $w = $this->filtro('e.id_sucursal_origen', 'e.create_encomienda', $g, $p);
         $filas = $mapa($this->q("SELECT CONCAT(so.ciudad_sucursal, ' ➔ ', sd.ciudad_sucursal) AS concepto,
@@ -286,7 +322,7 @@ class Reportes_model {
                                    AND CAST(e.estado_pago_encomienda AS UNSIGNED) = 1
                                    AND IFNULL(en.monto_entrega_encomienda, 0) = 0 AND $w
                                  GROUP BY concepto ORDER BY monto DESC", $p));
-        if ($filas) $tablas[] = $tabla('INGRESOS POR ENCOMIENDAS PAGADAS EN ORIGEN (POR RUTA)', $filas, 'Ruta');
+        if ($filas) $tablas[] = $tabla('ENCOMIENDAS PAGADAS EN ORIGEN (POR RUTA)', $filas, 'Ruta');
 
         $otros = [];
         $p = []; $w = $this->filtro('e.id_sucursal_destino', 'en.create_entrega_encomienda', $g, $p);
@@ -298,26 +334,26 @@ class Reportes_model {
         if ($otros) $tablas[] = $tabla('OTROS INGRESOS', $otros, 'Concepto');
 
         $filas = $mapa($this->movimientos($g, 'egr'));
-        if ($filas) $tablas[] = $tabla('EGRESOS DEL MES', $filas, 'Concepto');
+        if ($filas) $tablas[] = $tabla('EGRESOS', $filas, 'Concepto');
         $filas = $mapa($this->movimientos($g, 'pre'));
-        if ($filas) $tablas[] = $tabla('PRÉSTAMOS DEL MES', $filas, 'Concepto');
+        if ($filas) $tablas[] = $tabla('PRÉSTAMOS', $filas, 'Concepto');
 
         $tablas[] = [
-            'titulo' => 'RESUMEN DEL MES',
+            'titulo' => 'RESUMEN DEL PERIODO',
             'cols'   => [['Concepto', 'texto'], ['Monto', 'monto']],
             'filas'  => [
                 ['VIENEN (SALDO ANTERIOR)', $c['vienen']],
-                ['TOTAL INGRESOS DEL MES', $c['ing']],
+                ['TOTAL INGRESOS', $c['ing']],
                 ['TOTAL INGRESOS (CON VIENEN)', $c['total']],
                 ['TOTAL EGRESOS', $c['egr']],
                 ['TOTAL PRÉSTAMOS', $c['pre']],
             ],
-            'pie'    => ['SALDO DEL MES', $c['saldo']],
+            'pie'    => ['SALDO FINAL', $c['saldo']],
         ];
 
         return [
-            'titulo'  => 'INFORME ECONÓMICO MES DE ' . mb_strtoupper(ValidarReportes::etiqueta($ym), 'UTF-8'),
-            'periodo' => ValidarReportes::etiqueta($ym),
+            'titulo'  => $titulo,
+            'periodo' => $periodo,
             'kpi'     => ['inicial' => $c['vienen'], 'ing' => $c['ing'], 'egr' => $c['egr'], 'pre' => $c['pre'], 'saldo' => $c['saldo']],
             'tablas'  => $tablas,
         ];
