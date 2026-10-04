@@ -1,5 +1,7 @@
 <?php
 /**
+ <?php
+/**
  * views/dashboard/reportes/index.php
  * Variables: $tipos, $sucursales, $veTodas, $mesActual, $anioActual, $hoy, $inicioMes
  */
@@ -96,10 +98,21 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   </div>
 
   <!-- Resultado -->
-  <div id="repContenedor">
-    <div class="text-center text-xs text-secondary py-5">Cargando informe...</div>
+  <div class="card border-0 shadow-sm border-radius-xl">
+    <div class="card-body p-3 p-md-4" id="repContenedor">
+      <div class="text-center text-xs text-secondary py-5">Cargando informe...</div>
+    </div>
   </div>
 </div>
+
+<style>
+  .rep-saldo { font-size:.8rem; font-weight:700; margin:0 0 .5rem; text-transform:uppercase; }
+  .rep-t { font-size:.72rem; font-weight:700; text-transform:uppercase; margin:.75rem 0 .25rem; }
+  .rep-tabla { width:100%; border-collapse:collapse; font-size:.78rem; background:#fff; }
+  .rep-tabla th, .rep-tabla td { border:1px solid #cfd4da; padding:4px 8px; white-space:nowrap; }
+  .rep-tabla th { background:#f5f6f8; font-size:.68rem; text-transform:uppercase; color:#67748e; }
+  .rep-tabla tfoot td { font-weight:700; background:#e8f5e9; }
+</style>
 
 <script>
 (function () {
@@ -108,13 +121,10 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   const $ = id => document.getElementById(id);
   const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
   const num = (n, dec) => (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  const bs = n => 'Bs. ' + num(n, 2);
   const pad = n => String(n).padStart(2, '0');
-  const DETALLE = ['diario', 'semanal', 'mensual'];
 
   let tipoActual = 'consolidado';
   let reqId = 0;
-  let chart = null;
 
   /* ---------- Semanas según el mes ---------- */
   function cargarSemanas() {
@@ -169,143 +179,29 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   }
 
   /* ---------- Componentes ---------- */
-  function card(inner, extra) {
-    return '<div class="card border-0 shadow-sm border-radius-xl ' + (extra || '') + '">' + inner + '</div>';
-  }
-
-  /** Resumen del periodo (siempre primero) */
-  function resumen(k) {
-    const ini = parseFloat(k.inicial) || 0, ing = parseFloat(k.ing) || 0;
-    const items = [
-      //['Vienen', 'Saldo del periodo anterior', ini, 'text-dark', 'account_balance_wallet', 'bg-gradient-dark'],
-      ['Ingresos', 'Pasajes, encomiendas y otros', ing, 'text-success', 'payments', 'bg-gradient-success'],
-      //['Disponible', 'Vienen + Ingresos', ini + ing, 'text-dark', 'add_card', 'bg-gradient-info'],
-      ['Egresos', 'Gastos del periodo', k.egr, 'text-danger', 'trending_down', 'bg-gradient-danger'],
-      //['Préstamos', 'Préstamos entregados', k.pre, 'text-danger', 'handshake', 'bg-gradient-warning'],
-      ['Saldo final', 'Disponible − egresos − préstamos', k.saldo, 'text-success', 'savings', 'bg-gradient-success']
-    ];
-    return '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Resumen del periodo</h6>' +
-      '<div class="row g-3 mb-4">' + items.map(function (i) {
-        return '<div class="col-12 col-sm-6 col-xl-4">' + card(
-          '<div class="card-body p-3 p-md-4 d-flex align-items-center justify-content-between gap-3">' +
-            '<div class="min-width-0">' +
-              '<p class="text-xs text-secondary font-weight-bold mb-0">' + i[0] + '</p>' +
-              '<h5 class="font-weight-bolder ' + i[3] + ' mb-0 text-break">' + bs(i[2]) + '</h5>' +
-              '<p class="text-xxs text-secondary mb-0">' + i[1] + '</p>' +
-            '</div>' +
-            '<div class="icon icon-md icon-shape ' + i[5] + ' text-center border-radius-md flex-shrink-0 d-flex align-items-center justify-content-center">' +
-              '<i class="material-symbols-rounded text-white">' + i[4] + '</i></div>' +
-          '</div>', 'h-100') + '</div>';
-      }).join('') + '</div>';
-  }
-
-  /** Tarjetas por periodo (mes o día) en cuadrícula */
-  function periodos(t) {
-    const grande = t.filas.length > 12;
-    const items = t.filas.map(function (f) {
-      const gasto = (parseFloat(f[4]) || 0) + (parseFloat(f[5]) || 0);
-      const neg = parseFloat(f[6]) < 0;
-      return '<div class="col-12 col-sm-6 col-xl-4">' + card(
-        '<div class="card-body p-3">' +
-          '<div class="d-flex justify-content-between align-items-center mb-3 gap-2">' +
-            '<h6 class="text-sm font-weight-bold text-dark mb-0">' + esc(f[0]) + '</h6>' +
-            '<span class="badge badge-sm ' + (neg ? 'bg-gradient-danger' : 'bg-gradient-success') + '">' + num(f[6], 2) + '</span>' +
-          '</div>' +
-          '<div class="row g-2 text-center">' +
-            '<div class="col-4"><span class="d-block text-xxs text-secondary">Ingresos</span><span class="text-xs font-weight-bolder text-success">' + num(f[1], 2) + '</span></div>' +
-            '<div class="col-4"><span class="d-block text-xxs text-secondary">Vienen</span><span class="text-xs font-weight-bolder text-dark">' + num(f[2], 2) + '</span></div>' +
-            '<div class="col-4"><span class="d-block text-xxs text-secondary">Egresos</span><span class="text-xs font-weight-bolder text-danger">' + num(gasto, 2) + '</span></div>' +
-          '</div>' +
-        '</div>', 'h-100 border') + '</div>';
-    }).join('');
-
-    return '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Detalle por periodo</h6>' +
-      '<div class="' + (grande ? 'overflow-auto pe-1' : '') + '"' + (grande ? ' style="max-height:560px"' : '') + '>' +
-      '<div class="row g-3">' + (items || '<div class="col-12 text-center text-xs text-secondary py-4">Sin registros</div>') + '</div></div>';
-  }
-
-  /** Bloque de detalle: filas con nombre y montos etiquetados (se adaptan a cualquier ancho) */
-  function bloque(t) {
-    const cols = t.cols;
-    const val = (c, v) => c[1] === 'monto' ? num(v, 2) : c[1] === 'entero' ? num(v, 0) : esc(v);
-    const color = c => {
-      const l = c[0].toLowerCase();
-      return (l.indexOf('egreso') > -1 || l.indexOf('préstamo') > -1) ? 'text-danger' : (l.indexOf('ingreso') > -1 ? 'text-success' : 'text-dark');
-    };
-    const montos = (fila, esPie) => cols.slice(1).map(function (c, j) {
-      const v = fila[j + 1];
-      if (v === null || v === undefined || v === '') return '';
-      return '<div class="text-end"><span class="d-block text-xxs text-secondary">' + esc(c[0]) + '</span>' +
-             '<span class="text-sm font-weight-bold ' + (esPie ? 'text-dark' : color(c)) + '">' + val(c, v) + '</span></div>';
-    }).join('');
-
-    const filas = t.filas.map(function (f) {
-      return '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-bottom border-light">' +
-        '<span class="text-sm font-weight-bold text-dark text-wrap">' + esc(f[0]) + '</span>' +
-        '<div class="d-flex flex-wrap justify-content-end gap-3 ms-auto">' + montos(f, false) + '</div></div>';
-    }).join('');
-
-    const pie = t.pie ? '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 bg-gray-100">' +
-      '<span class="text-sm font-weight-bolder text-dark">' + esc(t.pie[0]) + '</span>' +
-      '<div class="d-flex flex-wrap justify-content-end gap-3 ms-auto">' + montos(t.pie, true) + '</div></div>' : '';
-
-    const cuerpo = t.filas.length > 10 ? '<div class="overflow-auto" style="max-height:400px">' + filas + '</div>' : filas;
-
-    return card(
-      '<div class="px-3 pt-3 pb-2"><h6 class="text-xs font-weight-bolder text-uppercase text-success mb-0">' + esc(t.titulo || 'Detalle') + '</h6></div>' +
-      (cuerpo || '<div class="text-center text-xs text-secondary py-4">Sin registros</div>') + pie,
-      'h-100 overflow-hidden');
+  function tabla(t) {
+    const c = t.cols;
+    const fmt = (col, v) => (v === null || v === undefined || v === '') ? ''
+      : col[1] === 'monto' ? num(v, 2) : col[1] === 'entero' ? num(v, 0) : esc(v);
+    const row = f => '<tr>' + c.map((x, i) =>
+      '<td class="' + (i ? 'text-end' : '') + '">' + fmt(x, f[i]) + '</td>').join('') + '</tr>';
+    return (t.titulo ? '<div class="rep-t">' + esc(t.titulo) + '</div>' : '') +
+      '<div class="table-responsive mb-3"><table class="rep-tabla"><thead><tr>' +
+      c.map((x, i) => '<th class="' + (i ? 'text-end' : '') + '">' + esc(x[0]) + '</th>').join('') +
+      '</tr></thead><tbody>' +
+      (t.filas.length ? t.filas.map(row).join('') : '<tr><td colspan="' + c.length + '" class="text-center">Sin registros</td></tr>') +
+      '</tbody>' + (t.pie ? '<tfoot>' + row(t.pie) + '</tfoot>' : '') + '</table></div>';
   }
 
   function pintar(r) {
-    const cont = $('repContenedor');
-    if (chart) { chart.destroy(); chart = null; }
-    const detalle = DETALLE.indexOf(r.tipo) !== -1;
-    let html = resumen(r.kpi);
-
-    if (detalle) {
-      const det = r.tablas.filter(t => t.titulo !== 'RESUMEN DEL PERIODO');
-      if (det.length) {
-        html += '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3 px-1">Detalle</h6>' +
-          '<div class="row g-3">' + det.map(t => '<div class="col-12 col-xl-6">' + bloque(t) + '</div>').join('') + '</div>';
-      }
-    } else {
-      const t0 = r.tablas[0];
-      if (t0.filas.length > 1) {
-        html += card('<div class="card-body p-3 p-md-4">' +
-          '<h6 class="text-xs font-weight-bolder text-uppercase text-dark mb-3">Ingresos vs egresos</h6>' +
-          '<div class="chart"><canvas id="repChart" class="chart-canvas" height="220"></canvas></div></div>', 'mb-4');
-      }
-      html += periodos(t0);
-    }
-    cont.innerHTML = html;
-
-    const cv = $('repChart');
-    if (cv && typeof Chart !== 'undefined') {
-      const f = r.tablas[0].filas;
-      chart = new Chart(cv.getContext('2d'), {
-        type: 'bar',
-        data: {
-          labels: f.map(x => x[0]),
-          datasets: [
-            { label: 'Ingresos', backgroundColor: '#4CAF50', borderRadius: 4, data: f.map(x => x[1]) },
-            { label: 'Egresos y préstamos', backgroundColor: '#F44335', borderRadius: 4, data: f.map(x => (+x[4] || 0) + (+x[5] || 0)) },
-            { type: 'line', label: 'Saldo final', borderColor: '#344767', borderWidth: 2, pointRadius: 2, tension: 0.3, data: f.map(x => x[6]) }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-          scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 60 } }, y: { grid: { color: '#e5e5e5' }, ticks: { font: { size: 10 } } } }
-        }
-      });
-    }
+    $('repContenedor').innerHTML =
+      '<p class="rep-saldo">' + esc(r.saldo_label) + ': ' + num(r.saldo, 2) + '</p>' +
+      r.tablas.map(tabla).join('');
   }
 
   function generar() {
     if (!valido()) return;
     const mio = ++reqId;
-    if (chart) { chart.destroy(); chart = null; }
     $('repContenedor').innerHTML = '<div class="text-center text-xs text-secondary py-5">Generando informe...</div>';
 
     fetch(baseUrl + '/reportes/datos?' + qs() + '&_=' + Date.now(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
