@@ -4,12 +4,15 @@ require_once __DIR__ . '/../../helpers/reportes/ValidarReportes.php';
 
 /**
  * Módulo Reportes (informes económicos del sindicato). Solo lectura.
- *   /reportes                 index      pantalla (filtros + tablas DataTable)
- *   /reportes/datos?...       datos      JSON con el reporte
- *   /reportes/exportar?...    exportar   Excel (.xls)
- *   /reportes/imprimir?...    imprimir   hoja imprimible (iframe global)
- * GET: tipo (resumen|detalle), desde/hasta (YYYY-MM) o mes (YYYY-MM), saldo, sucursal,
- *      finanzas, parada. Alcance: sindicato de la sesión; solo el administrador ve todas las sucursales.
+ *   /reportes                              index                     pantalla (filtros + tablas)
+ *   /reportes/datos?...                    datos                     JSON con el reporte
+ *   /reportes/obtenerSindicatosDestino?destino=X   JSON: sindicatos con ruta a ese destino
+ *   /reportes/exportar?...                 exportar                  Excel (.xls)
+ *   /reportes/imprimir?...                 imprimir                  hoja imprimible (iframe global)
+ * GET: tipo (consolidado|diario|semanal|mensual|anual|rango|destino), dia, mes, semana, anio,
+ *      desde/hasta, saldo, sucursal, finanzas, parada, destino, sind (ids con coma),
+ *      precios ("id:monto,id:monto"). Alcance: sindicato de la sesión; solo el administrador
+ *      ve todas las sucursales.
  */
 class Reportes_controller {
     private $model;
@@ -21,9 +24,13 @@ class Reportes_controller {
 
     public function index() {
         $this->acceso('vista');
-               $this->vista('reportes/index', [
+        $permitidas = $this->sucursalesPermitidas();
+        $ids = array_map('intval', array_column($permitidas, 'id_sucursal'));
+
+        $this->vista('reportes/index', [
             'tipos'      => ValidarReportes::TIPOS,
-            'sucursales' => $this->sucursalesPermitidas(),
+            'sucursales' => $permitidas,
+            'destinos'   => $this->model->getDestinos($ids),
             'veTodas'    => $this->veTodas(),
             'mesActual'  => date('Y-m'),
             'anioActual' => date('Y'),
@@ -44,6 +51,18 @@ class Reportes_controller {
             $this->json(['success' => false, 'message' => 'Error de base de datos al generar el reporte. Revise el log de PHP.']);
         }
         $this->json(['success' => true, 'reporte' => $reporte]);
+    }
+
+    /** Sindicatos que tienen ruta hacia el destino elegido (para el filtro "Por destino"). */
+    public function obtenerSindicatosDestino() {
+        $this->acceso('json');
+        $destino = mb_substr(trim((string)($_GET['destino'] ?? '')), 0, ValidarReportes::MAX_DESTINO, 'UTF-8');
+        if ($destino === '') {
+            $this->json(['success' => false, 'message' => 'Seleccione el destino.']);
+        }
+
+        $ids = array_map('intval', array_column($this->sucursalesPermitidas(), 'id_sucursal'));
+        $this->json(['success' => true, 'sindicatos' => $this->model->getSindicatosDestino($destino, $ids)]);
     }
 
     /** Excel: tablas HTML con cabecera .xls (abre en Excel/LibreOffice sin librerías externas). */
@@ -70,7 +89,11 @@ class Reportes_controller {
         echo "\xEF\xBB\xBF<html><head><meta charset=\"utf-8\"></head><body>";
         echo '<p style="font-size:16px;font-weight:bold">' . $e($d['sindicato']) . '</p>';
         echo '<p style="font-weight:bold">' . $e($r['titulo']) . '</p>';
-        echo '<p>' . $e($r['saldo_label']) . ': ' . number_format($r['saldo'], 2) . ' · ' . $e($d['sucursalTxt']) . '</p>';
+        if (!empty($r['saldo_label'])) {
+            echo '<p>' . $e($r['saldo_label']) . ': ' . number_format($r['saldo'], 2) . ' · ' . $e($d['sucursalTxt']) . '</p>';
+        } else {
+            echo '<p>' . $e($d['sucursalTxt']) . '</p>';
+        }
 
         foreach ($r['tablas'] as $t) {
             if ($t['titulo']) echo '<p style="font-weight:bold">' . $e($t['titulo']) . '</p>';

@@ -1,9 +1,7 @@
 <?php
 /**
- <?php
-/**
  * views/dashboard/reportes/index.php
- * Variables: $tipos, $sucursales, $veTodas, $mesActual, $anioActual, $hoy, $inicioMes
+ * Variables: $tipos, $sucursales, $destinos, $veTodas, $mesActual, $anioActual, $hoy, $inicioMes
  */
 $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 ?>
@@ -31,7 +29,7 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
       <label class="form-label text-xs font-weight-bold text-dark mb-2 d-block">Tipo de reporte</label>
       <div class="row g-2 mb-4" id="tiposReporte">
         <?php foreach ($tipos as $k => $t): ?>
-          <div class="col-4 col-md-2">
+          <div class="col-4 col-md">
             <button type="button"
                     class="btn btn-sm w-100 mb-0 py-2 px-1 d-flex flex-column flex-xl-row align-items-center justify-content-center gap-1 text-xs <?= $k === 'consolidado' ? 'bg-gradient-success text-white' : 'btn-outline-success' ?>"
                     data-tipo="<?= $h($k) ?>" data-desc="<?= $h($t['desc']) ?>" data-titulo="<?= $h($t['titulo']) ?>">
@@ -47,7 +45,7 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
           <label class="form-label text-xs font-weight-bold text-dark mb-1">Día</label>
           <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fDia" value="<?= $h($hoy) ?>"></div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="semanal mensual">
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="semanal mensual destino">
           <label class="form-label text-xs font-weight-bold text-dark mb-1">Mes</label>
           <div class="input-group input-group-outline is-filled"><input type="month" class="form-control" id="fMes" value="<?= $h($mesActual) ?>"></div>
         </div>
@@ -68,6 +66,19 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
           <div class="input-group input-group-outline is-filled"><input type="date" class="form-control" id="fHasta" value="<?= $h($hoy) ?>"></div>
         </div>
 
+        <!-- Filtro por destino -->
+        <div class="col-12 col-md-6 col-xl-3 d-none" data-tipos="destino">
+          <label class="form-label text-xs font-weight-bold text-dark mb-1">Destino</label>
+          <div class="input-group input-group-outline is-filled">
+            <select class="form-control" id="fDestino">
+              <option value="">Seleccione el destino...</option>
+              <?php foreach ($destinos as $d): ?>
+                <option value="<?= $h($d) ?>"><?= $h($d) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
+
         <div class="col-12 col-md-6 col-xl-4">
           <label class="form-label text-xs font-weight-bold text-dark mb-1">Sucursal</label>
           <div class="input-group input-group-outline is-filled">
@@ -83,6 +94,14 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
           <button type="button" class="btn bg-gradient-dark w-100 mb-0 d-inline-flex align-items-center justify-content-center gap-1" id="btnGenerar">
             <i class="material-symbols-rounded text-sm">filter_alt</i> Aplicar
           </button>
+        </div>
+      </div>
+
+      <!-- Sindicatos con ruta al destino elegido -->
+      <div class="d-none mt-4" data-tipos="destino" id="panelSindicatos">
+        <label class="form-label text-xs font-weight-bold text-dark mb-1 d-block">Sindicatos con ruta a este destino y monto por orden (Bs.)</label>
+        <div class="row g-2" id="listaSindicatos">
+          <div class="col-12 text-xs text-secondary">Seleccione un destino para ver los sindicatos.</div>
         </div>
       </div>
     </div>
@@ -107,11 +126,12 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 <style>
   .rep-saldo { font-size:.8rem; font-weight:700; margin:0 0 .5rem; text-transform:uppercase; }
-  .rep-t { font-size:.72rem; font-weight:700; text-transform:uppercase; margin:.75rem 0 .25rem; }
+  .rep-t { font-size:.72rem; font-weight:700; text-transform:uppercase; margin:.25rem 0 .25rem; }
   .rep-tabla { width:100%; border-collapse:collapse; font-size:.78rem; background:#fff; }
   .rep-tabla th, .rep-tabla td { border:1px solid #cfd4da; padding:4px 8px; white-space:nowrap; }
   .rep-tabla th { background:#f5f6f8; font-size:.68rem; text-transform:uppercase; color:#67748e; }
   .rep-tabla tfoot td { font-weight:700; background:#e8f5e9; }
+  .sind-precio { max-width:110px; }
 </style>
 
 <script>
@@ -141,12 +161,59 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     else sel.value = (v === MES_ACTUAL) ? Math.ceil(new Date().getDate() / 7) : 1;
   }
 
+  /* ---------- Sindicatos del destino ---------- */
+  function sindSeleccionados() {
+    return Array.from(document.querySelectorAll('#listaSindicatos .chk-sind:checked'));
+  }
+
+  function destinoListo() {
+    return !!$('fDestino').value && sindSeleccionados().length > 0;
+  }
+
+  function cargarSindicatos() {
+    const d = $('fDestino').value, lista = $('listaSindicatos');
+    if (!d) {
+      lista.innerHTML = '<div class="col-12 text-xs text-secondary">Seleccione un destino para ver los sindicatos.</div>';
+      return Promise.resolve();
+    }
+    lista.innerHTML = '<div class="col-12 text-xs text-secondary">Cargando sindicatos...</div>';
+
+    return fetch(baseUrl + '/reportes/obtenerSindicatosDestino?destino=' + encodeURIComponent(d) + '&_=' + Date.now(),
+                 { headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
+      .then(r => r.json())
+      .then(function (res) {
+        if (!res.success) { lista.innerHTML = '<div class="col-12 text-xs text-danger">' + esc(res.message) + '</div>'; return; }
+        if (!res.sindicatos.length) {
+          lista.innerHTML = '<div class="col-12 text-xs text-warning font-weight-bold">Ningún sindicato tiene ruta hacia este destino.</div>';
+          return;
+        }
+        lista.innerHTML = res.sindicatos.map(function (s) {
+          return '<div class="col-12 col-md-6 col-xl-4"><div class="p-2 border border-radius-md d-flex align-items-center gap-2">' +
+            '<div class="form-check mb-0"><input class="form-check-input chk-sind" type="checkbox" checked id="sind_' + s.id_sindicato + '" value="' + s.id_sindicato + '"></div>' +
+            '<label class="text-xs font-weight-bold text-dark mb-0 flex-grow-1" for="sind_' + s.id_sindicato + '">' + esc(s.nombre_sindicato) + '</label>' +
+            '<input type="number" min="0" step="0.01" value="0" title="Monto por orden (Bs.)" class="form-control border px-2 py-1 border-radius-md text-xs sind-precio" data-id="' + s.id_sindicato + '">' +
+            '</div></div>';
+        }).join('');
+      })
+      .catch(function () {
+        lista.innerHTML = '<div class="col-12 text-xs text-danger">No se pudieron cargar los sindicatos.</div>';
+      });
+  }
+
   /* ---------- Filtros ---------- */
   function qs() {
+    const sel = sindSeleccionados();
+    const precios = sel.map(function (c) {
+      const inp = document.querySelector('#listaSindicatos .sind-precio[data-id="' + c.value + '"]');
+      return c.value + ':' + ((inp && inp.value !== '') ? inp.value : '0');
+    });
     return new URLSearchParams({
       tipo: tipoActual, dia: $('fDia').value, mes: $('fMes').value, semana: $('fSemana').value,
       anio: $('fAnio').value, desde: $('fDesde').value, hasta: $('fHasta').value,
-      sucursal: $('fSucursal').value || 0
+      sucursal: $('fSucursal').value || 0,
+      destino: $('fDestino').value,
+      sind: sel.map(c => c.value).join(','),
+      precios: precios.join(',')
     }).toString();
   }
 
@@ -155,6 +222,11 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     if (t === 'diario' && !$('fDia').value) return aviso('Falta el día', 'Seleccione el día del informe.');
     if (t === 'semanal' && (!$('fMes').value || !$('fSemana').value)) return aviso('Falta la semana', 'Seleccione el mes y la semana.');
     if (t === 'mensual' && !$('fMes').value) return aviso('Falta el mes', 'Seleccione el mes del informe.');
+    if (t === 'destino') {
+      if (!$('fMes').value) return aviso('Falta el mes', 'Seleccione el mes del informe.');
+      if (!$('fDestino').value) return aviso('Falta el destino', 'Seleccione el destino del informe.');
+      if (!sindSeleccionados().length) return aviso('Faltan sindicatos', 'Seleccione al menos un sindicato.');
+    }
     if (t === 'anual') {
       const a = parseInt($('fAnio').value);
       if (!a || a < 2000 || a > 2100) return aviso('Año inválido', 'Indique un año entre 2000 y 2100.');
@@ -186,17 +258,20 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     const row = f => '<tr>' + c.map((x, i) =>
       '<td class="' + (i ? 'text-end' : '') + '">' + fmt(x, f[i]) + '</td>').join('') + '</tr>';
     return (t.titulo ? '<div class="rep-t">' + esc(t.titulo) + '</div>' : '') +
-      '<div class="table-responsive mb-3"><table class="rep-tabla"><thead><tr>' +
+      '<div class="table-responsive"><table class="rep-tabla"><thead><tr>' +
       c.map((x, i) => '<th class="' + (i ? 'text-end' : '') + '">' + esc(x[0]) + '</th>').join('') +
       '</tr></thead><tbody>' +
       (t.filas.length ? t.filas.map(row).join('') : '<tr><td colspan="' + c.length + '" class="text-center">Sin registros</td></tr>') +
       '</tbody>' + (t.pie ? '<tfoot>' + row(t.pie) + '</tfoot>' : '') + '</table></div>';
   }
 
+  // Las tablas pequeñas ("mitad") se muestran de a dos por fila en pantallas grandes
   function pintar(r) {
     $('repContenedor').innerHTML =
-      '<p class="rep-saldo">' + esc(r.saldo_label) + ': ' + num(r.saldo, 2) + '</p>' +
-      r.tablas.map(tabla).join('');
+      (r.saldo_label ? '<p class="rep-saldo">' + esc(r.saldo_label) + ': ' + num(r.saldo, 2) + '</p>' : '') +
+      '<div class="row g-3">' +
+      r.tablas.map(t => '<div class="col-12' + (t.mitad ? ' col-lg-6' : '') + '">' + tabla(t) + '</div>').join('') +
+      '</div>';
   }
 
   function generar() {
@@ -225,17 +300,33 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
       });
   }
 
+  // Genera automáticamente; en "Por destino" espera a que haya destino y sindicatos elegidos
+  function auto() {
+    if (tipoActual === 'destino' && (!$('fMes').value || !destinoListo())) {
+      reqId++;
+      $('repTitulo').textContent = 'Informe por destino';
+      $('repSub').innerHTML = '&nbsp;';
+      $('repContenedor').innerHTML = '<div class="text-center text-xs text-secondary py-5">Seleccione el mes, el destino y los sindicatos para generar el informe.</div>';
+      return;
+    }
+    generar();
+  }
+
   /* ---------- Eventos ---------- */
   $('tiposReporte').addEventListener('click', function (e) {
     const b = e.target.closest('[data-tipo]');
     if (!b || b.dataset.tipo === tipoActual) return;
     aplicarTipo(b);
-    generar();
+    auto();
   });
 
   $('fMes').addEventListener('change', cargarSemanas);
   $('btnGenerar').addEventListener('click', generar);
-  ['fDia', 'fMes', 'fSemana', 'fAnio', 'fDesde', 'fHasta', 'fSucursal'].forEach(id => $(id).addEventListener('change', generar));
+  ['fDia', 'fMes', 'fSemana', 'fAnio', 'fDesde', 'fHasta', 'fSucursal'].forEach(id => $(id).addEventListener('change', auto));
+
+  $('fDestino').addEventListener('change', function () { cargarSindicatos().then(auto); });
+  $('listaSindicatos').addEventListener('change', auto); // casillas y montos por orden
+
   $('btnImprimir').addEventListener('click', function () { if (valido()) lanzarImpresionIframe(baseUrl + '/reportes/imprimir?' + qs()); });
   $('btnExcel').addEventListener('click', function () { if (valido()) window.location.href = baseUrl + '/reportes/exportar?' + qs(); });
 

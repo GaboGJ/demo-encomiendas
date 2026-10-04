@@ -3,8 +3,9 @@
  * Reportes_model (solo lectura).
  * reporte($f) devuelve una estructura genérica que usan la pantalla, la impresión y el Excel:
  *   ['tipo','titulo','periodo','saldo_label','saldo','kpi'=>[inicial,ing,egr,pre,saldo],
- *    'tablas'=>[ ['titulo','cols'=>[[label,tipo]],'filas'=>[[...]],'pie'=>[...]|null ] ]]
+ *    'tablas'=>[ ['titulo','mitad'=>bool,'cols'=>[[label,tipo]],'filas'=>[[...]],'pie'=>[...]|null ] ]]
  * Tipos de columna: texto | entero | monto.
+ * 'mitad' = true -> la tabla ocupa media fila (se muestran de a dos).
  *
  * Fuentes de ingresos: pasajes (detalles activos), encomiendas pagadas en origen, cobros COD en
  * destino (entregas_encomiendas) y movimientos de caja tipo ingreso. Egresos y préstamos salen de
@@ -12,6 +13,9 @@
  *
  * Tipos "detalle" (diario/semanal/mensual): un solo periodo con desglose; el saldo "Vienen"
  * se acumula desde el 1 de enero ($f['acum_desde']).
+ *
+ * Tipo "destino": órdenes de ruta = turnos despachados hacia una ciudad destino en el mes,
+ * agrupados por el sindicato del socio titular del vehículo.
  */
 class Reportes_model {
     private $pdo;
@@ -61,6 +65,69 @@ class Reportes_model {
         } catch (PDOException $e) {
             error_log('Reportes_model::primerMes: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    /* ---------------- Filtro por destino ---------------- */
+
+    /** Ciudades destino disponibles (rutas y turnos de las sucursales dadas). */
+    public function getDestinos(array $ids) {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!$ids) return [];
+        $in = implode(',', $ids); // enteros ya saneados
+
+        try {
+            $sql = "SELECT sd.ciudad_sucursal AS ciudad
+                    FROM precios_pasajes pp
+                    INNER JOIN sucursales sd ON pp.id_sucursal_destino = sd.id_sucursal
+                    WHERE pp.id_sucursal_origen IN ($in) AND pp.delete_precio_pasaje IS NULL AND sd.delete_sucursal IS NULL
+                    UNION
+                    SELECT sd.ciudad_sucursal AS ciudad
+                    FROM turnos t
+                    INNER JOIN sucursales sd ON t.id_sucursal_destino = sd.id_sucursal
+                    WHERE t.id_sucursal_origen IN ($in) AND t.delete_turno IS NULL AND sd.delete_sucursal IS NULL
+                    ORDER BY ciudad ASC";
+            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            error_log('Reportes_model::getDestinos: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Sindicatos que tienen ruta hacia esa ciudad: los que tienen una ruta (precios_pasajes) desde
+     * sus sucursales, o cuyos vehículos hicieron turnos hacia ella.
+     * @return array [['id_sindicato'=>, 'nombre_sindicato'=>], ...]
+     */
+    public function getSindicatosDestino($ciudad, array $ids) {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        $ciudad = mb_strtolower(trim((string)$ciudad), 'UTF-8');
+        if (!$ids || $ciudad === '') return [];
+        $in = implode(',', $ids);
+
+        try {
+            $sql = "SELECT sn.id_sindicato, sn.nombre_sindicato
+                    FROM turnos t
+                    INNER JOIN sucursales sd ON t.id_sucursal_destino = sd.id_sucursal
+                    INNER JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
+                    INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                    INNER JOIN socios so ON v.id_socio = so.id_socio
+                    INNER JOIN sindicatos sn ON so.id_sindicato = sn.id_sindicato
+                    WHERE LOWER(sd.ciudad_sucursal) = :c1 AND t.id_sucursal_origen IN ($in)
+                      AND t.delete_turno IS NULL AND sn.delete_sindicato IS NULL
+                    UNION
+                    SELECT sn.id_sindicato, sn.nombre_sindicato
+                    FROM precios_pasajes pp
+                    INNER JOIN sucursales sor ON pp.id_sucursal_origen = sor.id_sucursal
+                    INNER JOIN sucursales sd ON pp.id_sucursal_destino = sd.id_sucursal
+                    INNER JOIN sindicatos sn ON sor.id_sindicato = sn.id_sindicato
+                    WHERE LOWER(sd.ciudad_sucursal) = :c2 AND pp.id_sucursal_origen IN ($in)
+                      AND pp.delete_precio_pasaje IS NULL AND sn.delete_sindicato IS NULL
+                    ORDER BY nombre_sindicato ASC";
+            return $this->q($sql, [':c1' => $ciudad, ':c2' => $ciudad]);
+        } catch (PDOException $e) {
+            error_log('Reportes_model::getSindicatosDestino: ' . $e->getMessage());
+            return [];
         }
     }
 
@@ -163,6 +230,10 @@ class Reportes_model {
     /* ---------------- Reporte ---------------- */
 
     public function reporte(array $f) {
+        if ($f['tipo'] === 'destino') {
+            return $this->reporteDestino($f);
+        }
+
         $agr    = $this->agrupado($f);
         $vienen = (float)$f['saldo'];
 
@@ -239,6 +310,7 @@ class Reportes_model {
                           'pre' => round($sp, 2), 'saldo' => $ult['saldo']],
             'tablas'  => [[
                 'titulo' => null,
+                'mitad'  => false,
                 'cols'   => [['Periodo / Fecha', 'texto'], ['Ingresos', 'monto'], ['Vienen', 'monto'], ['Total ingresos', 'monto'],
                              ['Egresos', 'monto'], ['Préstamos', 'monto'], ['Saldo final', 'monto']],
                 'filas'  => $filas,
@@ -272,16 +344,18 @@ class Reportes_model {
         $mapa = function ($rows) use ($num) {
             return array_map(function ($r) use ($num) { return $num([$r['concepto'], $r['cantidad'], $r['monto']]); }, $rows);
         };
+        // Las tablas de 3 columnas son pequeñas: ocupan media fila (se muestran de a dos)
         $tabla = function ($titulo, $filas, $colConcepto) {
             $cant = array_sum(array_column($filas, 1));
             $mont = round(array_sum(array_column($filas, 2)), 2);
-            return ['titulo' => $titulo, 'cols' => [[$colConcepto, 'texto'], ['Cantidad', 'entero'], ['Monto', 'monto']],
+            return ['titulo' => $titulo, 'mitad' => true,
+                    'cols' => [[$colConcepto, 'texto'], ['Cantidad', 'entero'], ['Monto', 'monto']],
                     'filas' => $filas, 'pie' => ['TOTAL', $cant, $mont]];
         };
 
         $tablas = [];
 
-        // Movimiento por día (solo semana y mes)
+        // Movimiento por día (solo semana y mes): ancho completo
         if ($f['tipo'] !== 'diario') {
             $dias = $this->agrupado(array_merge($f, ['ini' => $b['desde'], 'fin' => $b['hasta'], 'fmt' => 'd']));
             ksort($dias);
@@ -291,7 +365,7 @@ class Reportes_model {
                 $ti += $v['ing']; $te += $v['egr']; $tp += $v['pre'];
             }
             if ($filas) {
-                $tablas[] = ['titulo' => 'MOVIMIENTO POR DÍA',
+                $tablas[] = ['titulo' => 'MOVIMIENTO POR DÍA', 'mitad' => false,
                              'cols'   => [['Día', 'texto'], ['Ingresos', 'monto'], ['Egresos', 'monto'], ['Préstamos', 'monto']],
                              'filas'  => $filas, 'pie' => ['TOTAL', round($ti, 2), round($te, 2), round($tp, 2)]];
             }
@@ -340,6 +414,7 @@ class Reportes_model {
 
         $tablas[] = [
             'titulo' => 'RESUMEN DEL PERIODO',
+            'mitad'  => true,
             'cols'   => [['Concepto', 'texto'], ['Monto', 'monto']],
             'filas'  => [
                 ['VIENEN (SALDO ANTERIOR)', $c['vienen']],
@@ -356,6 +431,82 @@ class Reportes_model {
             'periodo' => $periodo,
             'kpi'     => ['inicial' => $c['vienen'], 'ing' => $c['ing'], 'egr' => $c['egr'], 'pre' => $c['pre'], 'saldo' => $c['saldo']],
             'tablas'  => $tablas,
+        ];
+    }
+
+    /**
+     * Informe por destino: una tabla por sindicato (rango de órdenes, cantidad x monto por orden,
+     * subtotal) y una tabla final con el total. Orden de ruta = turno despachado hacia la ciudad
+     * destino en el mes, del sindicato del socio titular del vehículo.
+     */
+    private function reporteDestino(array $f) {
+        $b   = $f['buckets'][0];
+        $g   = ['sucursales' => $f['sucursales'], 'ini' => $b['desde'], 'fin' => $b['hasta']];
+        $up  = function ($s) { return mb_strtoupper($s, 'UTF-8'); };
+        $mes = ValidarReportes::etiqueta(substr($b['desde'], 0, 7));
+        $ciudad = mb_strtolower($f['destino'], 'UTF-8');
+
+        $permitidos = [];
+        foreach ($this->getSindicatosDestino($f['destino'], $f['sucursales']) as $s) {
+            $permitidos[(int)$s['id_sindicato']] = $s['nombre_sindicato'];
+        }
+
+        $codigo = function ($id) { return 'T-' . str_pad((int)$id, 4, '0', STR_PAD_LEFT); };
+        $tablas = []; $resumen = []; $totCant = 0; $totMonto = 0.0;
+
+        foreach ($f['sindicatos'] as $id) {
+            if (!isset($permitidos[$id])) continue;
+
+            $p = []; $w = $this->filtro('t.id_sucursal_origen', 't.fecha_salida_turno', $g, $p);
+            $p[':sin'] = $id;
+            $p[':ciu'] = $ciudad;
+            $r = $this->q("SELECT COUNT(*) AS cantidad, MIN(t.id_turno) AS mn, MAX(t.id_turno) AS mx
+                           FROM turnos t
+                           INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+                           INNER JOIN sucursales sd ON t.id_sucursal_destino = sd.id_sucursal
+                           INNER JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
+                           INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                           INNER JOIN socios so ON v.id_socio = so.id_socio
+                           WHERE so.id_sindicato = :sin
+                             AND LOWER(sd.ciudad_sucursal) = :ciu
+                             AND LOWER(et.nombre_estado_turno) LIKE '%despachado%'
+                             AND (t.estado_turno = 1 OR t.estado_turno IS NULL)
+                             AND $w", $p)[0];
+
+            $cant   = (int)$r['cantidad'];
+            $precio = (float)($f['precios'][$id] ?? 0);
+            $monto  = round($cant * $precio, 2);
+            $rango  = $cant > 0 ? ($r['mn'] === $r['mx'] ? $codigo($r['mn']) : $codigo($r['mn']) . ' al ' . $codigo($r['mx'])) : 'Sin órdenes en el mes';
+
+            $tablas[] = [
+                'titulo' => 'SIND. ' . $up($permitidos[$id]),
+                'mitad'  => true,
+                'cols'   => [['Órdenes de ruta', 'texto'], ['Cantidad', 'texto'], ['Monto', 'monto']],
+                'filas'  => [[$rango, $cant . ' órdenes × ' . number_format($precio, 2) . ' c/u', $monto]],
+                'pie'    => ['Subtotal', $cant . ' órdenes', $monto],
+            ];
+            $resumen[] = [$permitidos[$id], $cant, $monto];
+            $totCant  += $cant;
+            $totMonto += $monto;
+        }
+        $totMonto = round($totMonto, 2);
+
+        $tablas[] = [
+            'titulo' => 'TOTAL ÓRDENES DE ' . $up($f['destino']) . ' MES DE ' . $up($mes),
+            'mitad'  => true,
+            'cols'   => [['Sindicato', 'texto'], ['Órdenes', 'entero'], ['Monto', 'monto']],
+            'filas'  => $resumen,
+            'pie'    => ['TOTAL', $totCant, $totMonto],
+        ];
+
+        return [
+            'tipo'        => 'destino',
+            'titulo'      => 'INFORME ECONÓMICO MES DE ' . $up($mes) . ' · INGRESOS POR ÓRDENES DE LA RUTA ' . $up($f['destino']),
+            'periodo'     => $mes . ' · ' . $f['destino'],
+            'saldo_label' => '',
+            'saldo'       => 0,
+            'kpi'         => ['inicial' => 0, 'ing' => $totMonto, 'egr' => 0, 'pre' => 0, 'saldo' => $totMonto],
+            'tablas'      => $tablas,
         ];
     }
 

@@ -2,7 +2,7 @@
 /**
  * helpers/reportes/ValidarReportes.php
  * Filtros, validación y formato del módulo Reportes (plantillas económicas del sindicato).
- * Tipos: consolidado | diario | semanal | mensual | anual | rango
+ * Tipos: consolidado | diario | semanal | mensual | anual | rango | destino
  *
  *  - consolidado : un mes por fila.
  *  - diario      : UN día específico (param "dia").
@@ -10,6 +10,9 @@
  *  - mensual     : UN mes específico (param "mes").
  *  - anual       : los 12 meses de un año (param "anio").
  *  - rango       : un día por fila entre "desde" y "hasta".
+ *  - destino     : órdenes de ruta de un mes hacia un destino, por sindicato
+ *                  (params "mes", "destino", "sind" = ids separados por coma,
+ *                   "precios" = "id:monto,id:monto").
  *
  * normalizar() construye $f['buckets'] (periodos [key,label,desde,hasta]).
  * $f['detalle'] = true en diario/semanal/mensual (un solo periodo con desglose).
@@ -20,6 +23,9 @@ class ValidarReportes {
     const MAX_MESES  = 36;
     const MAX_DIAS   = 366;
     const MAX_NOMBRE = 60;
+    const MAX_DESTINO = 50;
+    const MAX_SINDICATOS = 50;
+    const MAX_PRECIO = 99999999.99;
 
     const TIPOS = [
         'consolidado' => ['titulo' => 'General', 'icono' => 'summarize',
@@ -34,6 +40,8 @@ class ValidarReportes {
                           'desc' => 'Los 12 meses de la gestión elegida.'],
         'rango'       => ['titulo' => 'Rango de fechas', 'icono' => 'event_note',
                           'desc' => 'Un día por fila entre dos fechas.'],
+        'destino'     => ['titulo' => 'Por destino', 'icono' => 'alt_route',
+                          'desc' => 'Ingresos por órdenes de ruta de un destino, separados por sindicato.'],
     ];
 
     const MESES = [1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
@@ -108,6 +116,21 @@ class ValidarReportes {
         return $out;
     }
 
+    /** "id:monto,id:monto" => [id => float|null]  (null = monto inválido) */
+    private static function precios($txt) {
+        $out = [];
+        foreach (explode(',', (string)$txt) as $par) {
+            $par = trim($par);
+            if ($par === '') continue;
+            $x = explode(':', $par, 2);
+            $id = intval($x[0]);
+            if ($id <= 0) continue;
+            $v = str_replace(',', '.', trim($x[1] ?? ''));
+            $out[$id] = ($v !== '' && is_numeric($v) && (float)$v >= 0 && (float)$v <= self::MAX_PRECIO) ? round((float)$v, 2) : null;
+        }
+        return $out;
+    }
+
     /**
      * @param int[]       $idsPermitidos sucursales que el usuario puede consultar
      * @param string|null $primerMes     'YYYY-MM' del primer registro (solo para consolidado)
@@ -117,6 +140,8 @@ class ValidarReportes {
         $suc      = intval($get['sucursal'] ?? 0);
         $saldoTxt = str_replace(',', '.', trim((string)($get['saldo'] ?? '')));
 
+        $sind = array_values(array_unique(array_filter(array_map('intval', explode(',', (string)($get['sind'] ?? ''))))));
+
         $f = [
             'tipo'       => $tipo,
             'sucursal'   => $suc,
@@ -124,6 +149,9 @@ class ValidarReportes {
             'saldo'      => $saldoTxt === '' ? 0.0 : (is_numeric($saldoTxt) ? round((float)$saldoTxt, 2) : null),
             'finanzas'   => mb_substr(trim((string)($get['finanzas'] ?? '')), 0, self::MAX_NOMBRE, 'UTF-8'),
             'parada'     => mb_substr(trim((string)($get['parada'] ?? '')), 0, self::MAX_NOMBRE, 'UTF-8'),
+            'destino'    => mb_substr(trim((string)($get['destino'] ?? '')), 0, self::MAX_DESTINO, 'UTF-8'),
+            'sindicatos' => array_slice($sind, 0, self::MAX_SINDICATOS),
+            'precios'    => self::precios($get['precios'] ?? ''),
             'fmt'        => 'm',
             'buckets'    => [],
             'detalle'    => in_array($tipo, ['diario', 'semanal', 'mensual'], true),
@@ -170,6 +198,12 @@ class ValidarReportes {
                 }
                 break;
 
+            case 'destino':
+                if ($mes) {
+                    $f['buckets'] = self::bucketsMeses($mes, $mes);
+                }
+                break;
+
             case 'anual':
                 $anio = intval($get['anio'] ?? 0);
                 if ($anio >= 2000 && $anio <= 2100) {
@@ -209,6 +243,14 @@ class ValidarReportes {
         }
         if ($f['saldo'] === null) return 'El saldo inicial no es un número válido.';
         if (!$f['sucursales']) return 'No tiene sucursales disponibles o la sucursal elegida no es válida.';
+
+        if ($f['tipo'] === 'destino') {
+            if ($f['destino'] === '') return 'Seleccione el destino del informe.';
+            if (!$f['sindicatos']) return 'Seleccione al menos un sindicato.';
+            foreach ($f['precios'] as $p) {
+                if ($p === null) return 'El monto por orden debe ser un número mayor o igual a 0.';
+            }
+        }
         return null;
     }
 

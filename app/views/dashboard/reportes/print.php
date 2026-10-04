@@ -2,7 +2,8 @@
 /**
  * views/dashboard/reportes/print.php
  * Variables: $f, $r (reporte), $sindicato, $sucursalTxt, $impreso
- * Formato de la hoja física: título, saldo inicial, tablas y firmas de Finanzas y Parada.
+ * Formato de la hoja física: título, saldo inicial (si aplica), tablas (las pequeñas de a dos
+ * por fila) y firmas de Finanzas y Parada.
  */
 $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 ?>
@@ -23,8 +24,13 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
         h1 { text-align:center; font-size:14px; margin:14px 0 6px; text-transform:uppercase; }
         .saldo { font-size:12px; font-weight:700; margin:8px 0 10px; }
         h2 { font-size:11.5px; text-transform:uppercase; margin:16px 0 4px; }
+        .rejilla { display:grid; grid-template-columns:1fr 1fr; gap:0 18px; align-items:start; }
+        .bloque { min-width:0; page-break-inside:avoid; }
+        .bloque.comp { grid-column:1 / -1; }
+        .bloque.mit table { font-size:10.5px; }
         table { width:100%; border-collapse:collapse; margin-bottom:6px; }
         th, td { border:1px solid var(--border); padding:6px 8px; font-size:11.5px; }
+        .bloque.mit th, .bloque.mit td { padding:5px 6px; font-size:10.5px; }
         th { background:#f5f6f8; text-transform:uppercase; font-size:10px; text-align:left; }
         .der { text-align:right; white-space:nowrap; }
         tfoot td { background:var(--brand-light); font-weight:800; }
@@ -53,38 +59,44 @@ $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
     </div>
 
     <h1><?= $h($r['titulo']) ?></h1>
-    <div class="saldo"><?= $h($r['saldo_label']) ?>: <?= number_format($r['saldo'], 2) ?></div>
+    <?php if (!empty($r['saldo_label'])): ?>
+        <div class="saldo"><?= $h($r['saldo_label']) ?>: <?= number_format($r['saldo'], 2) ?></div>
+    <?php endif; ?>
 
+    <div class="rejilla">
     <?php foreach ($r['tablas'] as $t): ?>
-        <?php if ($t['titulo']): ?><h2><?= $h($t['titulo']) ?></h2><?php endif; ?>
-        <table>
-            <thead>
-                <tr>
-                    <?php foreach ($t['cols'] as $c): ?>
-                        <th class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h($c[0]) ?></th>
-                    <?php endforeach; ?>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($t['filas'] as $fila): ?>
+        <div class="bloque <?= !empty($t['mitad']) ? 'mit' : 'comp' ?>">
+            <?php if ($t['titulo']): ?><h2><?= $h($t['titulo']) ?></h2><?php endif; ?>
+            <table>
+                <thead>
                     <tr>
-                        <?php foreach ($t['cols'] as $i => $c): ?>
-                            <td class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h(ValidarReportes::formatear($fila[$i] ?? null, $c[1])) ?></td>
+                        <?php foreach ($t['cols'] as $c): ?>
+                            <th class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h($c[0]) ?></th>
                         <?php endforeach; ?>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <?php if ($t['pie']): ?>
-            <tfoot>
-                <tr>
-                    <?php foreach ($t['cols'] as $i => $c): ?>
-                        <td class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h(ValidarReportes::formatear($t['pie'][$i] ?? null, $c[1])) ?></td>
+                </thead>
+                <tbody>
+                    <?php foreach ($t['filas'] as $fila): ?>
+                        <tr>
+                            <?php foreach ($t['cols'] as $i => $c): ?>
+                                <td class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h(ValidarReportes::formatear($fila[$i] ?? null, $c[1])) ?></td>
+                            <?php endforeach; ?>
+                        </tr>
                     <?php endforeach; ?>
-                </tr>
-            </tfoot>
-            <?php endif; ?>
-        </table>
+                </tbody>
+                <?php if ($t['pie']): ?>
+                <tfoot>
+                    <tr>
+                        <?php foreach ($t['cols'] as $i => $c): ?>
+                            <td class="<?= $c[1] === 'texto' ? '' : 'der' ?>"><?= $h(ValidarReportes::formatear($t['pie'][$i] ?? null, $c[1])) ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+                </tfoot>
+                <?php endif; ?>
+            </table>
+        </div>
     <?php endforeach; ?>
+    </div>
 
     <div class="pie-nombres">
         <p>Encargado de Finanzas: <strong><?= $h($f['finanzas']) ?></strong></p>
