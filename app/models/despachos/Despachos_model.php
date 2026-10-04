@@ -477,8 +477,10 @@ class Despachos_model {
             $idPasajeDesp = $this->idEstado('estados_pasajes', 'id_estado_pasaje', 'nombre_estado_pasaje', ['despachado']);
             $idEncDesp = $this->idEstado('estados_encomiendas', 'id_estado_encomienda', 'nombre_estado_encomienda', ['enviado', 'despachado', 'en Ruta', 'en transito']);
  
-            $this->pdo->prepare("UPDATE turnos SET hora_salida_turno = :h, id_estado_turno = :e, update_turno = NOW() WHERE id_turno = :t")
+            $this->pdo->prepare("UPDATE turnos SET fecha_salida_turno = CURDATE(), hora_salida_turno = :h, id_estado_turno = :e, update_turno = NOW() WHERE id_turno = :t")
                 ->execute([':h' => date('H:i:s'), ':e' => $idTurnoDesp, ':t' => $id_turno]);
+            //$this->pdo->prepare("UPDATE turnos SET hora_salida_turno = :h, id_estado_turno = :e, update_turno = NOW() WHERE id_turno = :t")
+               // ->execute([':h' => date('H:i:s'), ':e' => $idTurnoDesp, ':t' => $id_turno]);
  
             $this->pdo->prepare("UPDATE detalles_pasajes SET id_estado_pasaje = :e, update_detalle_pasaje = NOW()
                 WHERE id_turno = :t AND (estado_detalle_pasaje = 1 OR estado_detalle_pasaje IS NULL)")
