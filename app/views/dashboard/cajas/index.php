@@ -1,4 +1,4 @@
-  <?php require_once __DIR__ . '/detail.php'; ?>
+<?php require_once __DIR__ . '/detail.php'; ?>
 <?php require_once __DIR__ . '/modales.php'; ?>
 <?php
   $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
@@ -51,7 +51,7 @@
         <div class="card-header bg-white p-4 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3">
           <div>
             <h5 class="font-weight-bolder text-dark mb-0">Cajas y Turnos de Caja</h5>
-            <p class="text-xs text-secondary mb-0">Administre las cajas de cada sucursal, aperture turnos y realice el arqueo y cierre</p>
+            <p class="text-xs text-secondary mb-0">Cajas de su sucursal: aperture turnos, registre movimientos y realice el arqueo y cierre</p>
           </div>
           <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto">
             <a href="<?= rtrim(URL, '/') ?>/cajas/papelera" class="btn btn-outline-secondary mb-0 border-radius-md px-3 d-inline-flex align-items-center justify-content-center gap-2">
@@ -132,6 +132,10 @@
                           </button>
                         <?php endif; ?>
                         <?php if ($puedeCerrar): ?>
+                          <button type="button" class="btn btn-sm btn-outline-dark mb-0 px-2 py-1 d-inline-flex align-items-center gap-1" title="Ingresos y egresos manuales"
+                                  onclick="abrirMovimientos(<?= (int)$c['id_historial_abierto'] ?>)">
+                            <i class="material-symbols-rounded text-sm">swap_vert</i> Movimientos
+                          </button>
                           <button type="button" class="btn btn-sm bg-gradient-danger text-white mb-0 px-2 py-1 d-inline-flex align-items-center gap-1" title="Arqueo y cierre"
                                   onclick="cerrarCaja(<?= (int)$c['id_historial_abierto'] ?>)">
                             <i class="material-symbols-rounded text-sm">calculate</i> Arqueo
@@ -187,7 +191,6 @@
   function procesar(url, datos, titError) {
     enviar(url, datos)
       .then(function (res) {
-        // El mensaje de éxito ya quedó encolado en Flash (servidor) y sale al recargar
         if (res.success) window.location.reload();
         else Swal.fire(titError, res.message || 'Ocurrió un error.', 'error');
       })

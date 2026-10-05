@@ -24,6 +24,75 @@
   </div>
 </div>
 
+<!-- MODAL: MOVIMIENTOS MANUALES -->
+<div class="modal fade" id="modalMovimientos" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-radius-xl">
+      <div class="modal-header bg-gradient-dark text-white p-3">
+        <h5 class="modal-title text-white font-weight-bold fs-6 mb-0 d-flex align-items-center">
+          <i class="material-symbols-rounded me-2">swap_vert</i> Movimientos · <span id="movCajaNombre" class="ms-1">-</span>
+        </h5>
+        <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-3 p-md-4">
+        <input type="hidden" id="movIdHistorial">
+
+        <div class="border border-radius-md p-3 mb-3">
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-3">
+              <label class="form-label text-xs font-weight-bold mb-0">Tipo *</label>
+              <div class="input-group input-group-outline is-filled">
+                <select class="form-control" id="movTipo">
+                  <option value="ingreso">Ingreso</option>
+                  <option value="egreso">Egreso</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="input-group input-group-outline">
+                <label class="form-label">Monto (Bs.) *</label>
+                <input type="number" class="form-control" id="movMonto" min="0.01" max="99999999.99" step="0.01">
+              </div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="input-group input-group-outline">
+                <label class="form-label">Concepto *</label>
+                <input type="text" class="form-control" id="movConcepto" maxlength="200">
+              </div>
+            </div>
+            <div class="col-12 col-md-2">
+              <button type="button" class="btn btn-sm bg-gradient-success w-100 mb-0" id="btnGuardarMov">Registrar</button>
+            </div>
+          </div>
+          <p class="text-xxs text-secondary mb-0 mt-2">Si un egreso es un préstamo, incluya la palabra "préstamo" en el concepto para que se contabilice como tal en los reportes.</p>
+        </div>
+
+        <div class="table-responsive p-0">
+          <table class="table table-borderless align-items-center mb-0 w-100" id="tablaMovimientos">
+            <thead>
+              <tr>
+                <th data-priority="1" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 ps-3 border-top border-bottom border-light">Fecha / Concepto</th>
+                <th data-priority="3" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 border-top border-bottom border-light">Tipo</th>
+                <th data-priority="2" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 border-top border-bottom border-light">Monto</th>
+                <th data-priority="1" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 pe-3 border-top border-bottom border-light">Acción</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between flex-wrap gap-2 p-3 bg-gray-100 border-radius-md mt-3">
+          <span class="text-xs font-weight-bold text-success">Ingresos: <span id="movTotIng">Bs. 0.00</span></span>
+          <span class="text-xs font-weight-bold text-danger">Egresos: <span id="movTotEgr">Bs. 0.00</span></span>
+        </div>
+      </div>
+      <div class="modal-footer bg-gray-100">
+        <button type="button" class="btn btn-sm bg-gradient-secondary mb-0" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: ARQUEO Y CIERRE -->
 <div class="modal fade" id="modalCerrarCaja" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -63,6 +132,7 @@
   const baseUrl = '<?= rtrim(URL, "/") ?>';
   const $ = id => document.getElementById(id);
   const bs = n => 'Bs. ' + (parseFloat(n) || 0).toFixed(2);
+  const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
   const modal = id => { const el = $(id); return bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el); };
   let totalSistema = 0;
 
@@ -89,10 +159,119 @@
     btn.disabled = true;
     post('/cajas/abrir', { id_caja: $('abrirIdCaja').value, monto_inicial: monto })
       .then(res => {
-        if (res.success) window.location.reload();   // el mensaje sale por Flash
+        if (res.success) window.location.reload();
         else { Swal.fire('No se pudo aperturar', res.message, 'error'); btn.disabled = false; }
       })
       .catch(() => { Swal.fire('Error', 'Ocurrió un error en el servidor', 'error'); btn.disabled = false; });
+  });
+
+  /* ---------- Movimientos manuales (DataTable con el helper global) ---------- */
+  const modalMovEl = $('modalMovimientos');
+  let dtMov = null, movimientos = [];
+
+  const fechaH = f => f ? f.substring(8, 10) + '/' + f.substring(5, 7) + '/' + f.substring(0, 4) + ' ' + f.substring(11, 16) : '';
+
+  function filaMov(m) {
+    const es = parseInt(m.tipo) === 1, v = parseFloat(m.monto) || 0;
+    return {
+      concepto: '<span class="text-xs text-dark font-weight-bold">' + esc(m.concepto) + '</span>' +
+                '<span class="d-block text-xxs text-secondary font-weight-normal">' + fechaH(m.fecha) + '</span>',
+      tipo:     '<span class="badge badge-sm ' + (es ? 'bg-gradient-success' : 'bg-gradient-danger') + '">' + (es ? 'Ingreso' : 'Egreso') + '</span>',
+      monto:    '<span class="text-xs font-weight-bold ' + (es ? 'text-success' : 'text-danger') + '">' + (es ? '' : '- ') + bs(v) + '</span>',
+      acciones: '<button type="button" class="btn btn-link text-danger p-0 m-0 mov-del" data-id="' + m.id_movimiento_caja + '" title="Anular">' +
+                '<i class="material-symbols-rounded text-sm">delete</i></button>'
+    };
+  }
+
+  function iniciarTablaMov() {
+    if (dtMov || typeof inicializarDataTable !== 'function') return;
+    dtMov = inicializarDataTable('#tablaMovimientos', {
+      ordering: false,
+      placeholder: 'Buscar movimiento...',
+      pageLength: 5,
+      columns: [
+        { data: 'concepto', className: 'ps-3',          responsivePriority: 1 },
+        { data: 'tipo',     className: 'text-center',    responsivePriority: 3 },
+        { data: 'monto',    className: 'text-end',       responsivePriority: 2 },
+        { data: 'acciones', className: 'text-end pe-3',  orderable: false, responsivePriority: 1 }
+      ]
+    });
+  }
+
+  function renderMov() {
+    if (!dtMov) return;
+    dtMov.clear();
+    dtMov.rows.add(movimientos.map(filaMov)).draw(false);
+  }
+
+  function cargarMovimientos(abrirModal) {
+    const id = $('movIdHistorial').value;
+    return fetch(`${baseUrl}/cajas/detalleMovimientos?id=${id}&_=${Date.now()}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.success) { Swal.fire('Error', res.message, 'error'); return; }
+        $('movCajaNombre').textContent = res.caja;
+        movimientos = res.movimientos || [];
+
+        let ing = 0, egr = 0;
+        movimientos.forEach(m => { const v = parseFloat(m.monto) || 0; if (parseInt(m.tipo) === 1) ing += v; else egr += v; });
+        $('movTotIng').textContent = bs(ing);
+        $('movTotEgr').textContent = bs(egr);
+
+        renderMov();
+        if (abrirModal) modal('modalMovimientos').show();
+      })
+      .catch(() => Swal.fire('Error', 'Error al conectar con el servidor.', 'error'));
+  }
+
+  // Con el modal ya visible DataTables puede medir bien las columnas
+  modalMovEl.addEventListener('shown.bs.modal', function () {
+    iniciarTablaMov();
+    renderMov();
+    if (dtMov) {
+      dtMov.columns.adjust();
+      if (dtMov.responsive) dtMov.responsive.recalc();
+    }
+  });
+  modalMovEl.addEventListener('hidden.bs.modal', function () {
+    movimientos = [];
+    if (dtMov) dtMov.clear().draw();
+  });
+
+  window.abrirMovimientos = function (idHistorial) {
+    $('movIdHistorial').value = idHistorial;
+    $('movMonto').value = ''; $('movConcepto').value = ''; $('movTipo').value = 'ingreso';
+    cargarMovimientos(true);
+  };
+
+  $('btnGuardarMov').addEventListener('click', function () {
+    const btn = this, monto = $('movMonto').value, concepto = $('movConcepto').value.trim();
+    if (!monto || parseFloat(monto) <= 0 || concepto.length < 3) {
+      Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Indique un monto mayor a 0 y un concepto (mínimo 3 caracteres).' });
+      return;
+    }
+    btn.disabled = true;
+    post('/cajas/guardarMovimiento', { id_historial: $('movIdHistorial').value, tipo: $('movTipo').value, monto: monto, concepto: concepto })
+      .then(res => {
+        btn.disabled = false;
+        if (res.success) { $('movMonto').value = ''; $('movConcepto').value = ''; cargarMovimientos(false); }
+        else Swal.fire('No se pudo registrar', res.message, 'error');
+      })
+      .catch(() => { Swal.fire('Error', 'Ocurrió un error en el servidor', 'error'); btn.disabled = false; });
+  });
+
+  // Delegado sobre la tabla: funciona con paginación y filas responsive
+  $('tablaMovimientos').addEventListener('click', function (e) {
+    const b = e.target.closest('.mov-del');
+    if (!b) return;
+    Swal.fire({ title: '¿Anular el movimiento?', text: 'Dejará de contar en el arqueo y los reportes.', icon: 'warning',
+                showCancelButton: true, confirmButtonText: 'Sí, anular', cancelButtonText: 'Cancelar', confirmButtonColor: '#f5365c' })
+      .then(c => {
+        if (!c.isConfirmed) return;
+        post('/cajas/anularMovimiento', { id_historial: $('movIdHistorial').value, id_movimiento: b.dataset.id })
+          .then(res => res.success ? cargarMovimientos(false) : Swal.fire('No se pudo anular', res.message, 'error'))
+          .catch(() => Swal.fire('Error', 'Ocurrió un error en el servidor', 'error'));
+      });
   });
 
   /* ---------- Arqueo y cierre ---------- */
@@ -152,7 +331,6 @@
       post('/cajas/cerrar', { id_historial: $('cerrarIdHistorial').value, monto_declarado: declarado })
         .then(res => {
           if (res.success) {
-            // Flash se mostrará al recargar; se imprime el reporte del turno cerrado
             lanzarImpresionIframe(baseUrl + '/cajas/imprimirCierre?id=' + res.id_historial, function () { window.location.reload(); });
           } else { Swal.fire('No se pudo cerrar', res.message, 'error'); btn.disabled = false; }
         })

@@ -3,17 +3,11 @@ require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
 require_once __DIR__ . '/../../helpers/cajas/ValidarCajas.php';
 
 /**
- * Módulo Cajas.
- * Rutas (router: /carpeta/accion):
- *   /cajas                  index          listado + métricas + apertura/cierre
- *   /cajas/new              new            formulario nuevo
- *   /cajas/update?id=X      update         formulario de edición
- *   /cajas/papelera         papelera       cajas eliminadas (borrado suave)
- *   /cajas/imprimirCierre?id=H             reporte imprimible de un turno
- *   AJAX/JSON: detalle · detalleTurno (GET) · guardar · actualizar · cambiarEstado ·
- *              eliminar · restaurar · abrir · cerrar (POST)
- *
- * Todo se filtra por el sindicato de la sesión (cajas -> sucursales.id_sindicato).
+ * Módulo Cajas. Todo se limita al sindicato Y a la sucursal de la sesión.
+ *   /cajas · /cajas/new · /cajas/update?id=X · /cajas/papelera · /cajas/imprimirCierre?id=H
+ *   AJAX/JSON: detalle · detalleTurno · detalleMovimientos (GET) ·
+ *              guardar · actualizar · cambiarEstado · eliminar · restaurar · abrir · cerrar ·
+ *              guardarMovimiento · anularMovimiento (POST)
  */
 class Cajas_controller {
     private $cajasModel;
@@ -30,9 +24,9 @@ class Cajas_controller {
     public function index() {
         $this->acceso(false);
         $this->vista('cajas/index', [
-            'cajas'            => $this->cajasModel->getCajas($this->idSindicato()),
-            'totalPapelera'    => $this->cajasModel->contarEliminadas($this->idSindicato()),
-            'idSucursalActual' => (int)($_SESSION['id_sucursal'] ?? 0),
+            'cajas'            => $this->cajasModel->getCajas($this->idSindicato(), $this->idSucursal()),
+            'totalPapelera'    => $this->cajasModel->contarEliminadas($this->idSindicato(), $this->idSucursal()),
+            'idSucursalActual' => $this->idSucursal(),
             'idUsuarioActual'  => $this->idUsuario(),
             'esPrincipal'      => (int)($_SESSION['es_principal'] ?? 0) === 1,
         ]);
@@ -40,14 +34,14 @@ class Cajas_controller {
 
     public function new() {
         $this->acceso(false);
-        $this->vista('cajas/new', ['sucursales' => $this->cajasModel->getSucursales($this->idSindicato())]);
+        $this->vista('cajas/new', ['sucursales' => $this->cajasModel->getSucursales($this->idSindicato(), $this->idSucursal())]);
     }
 
     public function update() {
         $this->acceso(false);
 
         $id = intval($_GET['id'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             Flash::set(false, 'La caja no existe o fue eliminada.', 'Caja no encontrada');
             header('Location: ' . rtrim(URL, '/') . '/cajas');
@@ -59,15 +53,14 @@ class Cajas_controller {
 
     public function papelera() {
         $this->acceso(false);
-        $this->vista('cajas/papelera', ['eliminados' => $this->cajasModel->getEliminadas($this->idSindicato())]);
+        $this->vista('cajas/papelera', ['eliminados' => $this->cajasModel->getEliminadas($this->idSindicato(), $this->idSucursal())]);
     }
 
-    /** Reporte imprimible de un turno (se abre en el iframe de lanzarImpresionIframe). */
     public function imprimirCierre() {
         $this->acceso(false);
 
         $id = intval($_GET['id'] ?? 0);
-        $turno = $id > 0 ? $this->cajasModel->obtenerHistorial($id, $this->idSindicato()) : null;
+        $turno = $id > 0 ? $this->turno($id) : null;
         if (!$turno) {
             die('Error: El turno de caja no existe.');
         }
@@ -79,12 +72,11 @@ class Cajas_controller {
 
     /* ============================ AJAX / JSON ============================ */
 
-    /** Detalle para el modal: datos de la caja + últimos turnos. */
     public function detalle() {
         $this->acceso(true);
 
         $id = intval($_GET['id'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             $this->json(['success' => false, 'message' => 'La caja no existe o fue eliminada.']);
         }
@@ -93,12 +85,11 @@ class Cajas_controller {
         $this->json(['success' => true, 'data' => $caja]);
     }
 
-    /** Resumen en vivo de un turno (modal de arqueo). GET id = id_historial_caja. */
     public function detalleTurno() {
         $this->acceso(true);
 
         $id = intval($_GET['id'] ?? 0);
-        $turno = $id > 0 ? $this->cajasModel->obtenerHistorial($id, $this->idSindicato()) : null;
+        $turno = $id > 0 ? $this->turno($id) : null;
         if (!$turno) {
             $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
         }
@@ -115,6 +106,7 @@ class Cajas_controller {
         $this->soloPost();
 
         $d = ValidarCajas::normalizar($_POST);
+        $d['id_sucursal'] = $this->idSucursal(); // siempre la sucursal del usuario
         $error = ValidarCajas::validar($d);
         if ($error !== null) {
             $this->json(['success' => false, 'message' => $error]);
@@ -122,7 +114,7 @@ class Cajas_controller {
 
         try {
             if (!$this->cajasModel->sucursalPerteneceASindicato($d['id_sucursal'], $this->idSindicato())) {
-                $this->json(['success' => false, 'message' => 'La sucursal no pertenece a su sindicato o está inactiva.']);
+                $this->json(['success' => false, 'message' => 'Su sucursal no pertenece a su sindicato o está inactiva.']);
             }
             $dup = $this->cajasModel->nombreDuplicado($d['id_sucursal'], $d['nombre']);
             if ($dup) {
@@ -144,13 +136,13 @@ class Cajas_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_caja'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             $this->json(['success' => false, 'message' => 'La caja no existe o fue eliminada.']);
         }
 
         $d = ValidarCajas::normalizar($_POST);
-        $d['id_sucursal'] = (int)$caja['id_sucursal']; // la sucursal no se modifica
+        $d['id_sucursal'] = (int)$caja['id_sucursal'];
         $error = ValidarCajas::validar($d);
         if ($error !== null) {
             $this->json(['success' => false, 'message' => $error]);
@@ -172,7 +164,6 @@ class Cajas_controller {
         }
     }
 
-    /** Activar / desactivar (reversible). No se puede desactivar con un turno abierto. */
     public function cambiarEstado() {
         $this->acceso(true);
         $this->soloPost();
@@ -180,7 +171,7 @@ class Cajas_controller {
         $id     = intval($_POST['id_caja'] ?? 0);
         $estado = intval($_POST['estado'] ?? 0) === 1 ? 1 : 0;
 
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             $this->json(['success' => false, 'message' => 'La caja no existe o fue eliminada.']);
         }
@@ -201,13 +192,12 @@ class Cajas_controller {
         }
     }
 
-    /** Borrado suave. */
     public function eliminar() {
         $this->acceso(true);
         $this->soloPost();
 
         $id = intval($_POST['id_caja'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             $this->json(['success' => false, 'message' => 'No se pudo eliminar: la caja no existe o ya fue eliminada.']);
         }
@@ -233,7 +223,7 @@ class Cajas_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_caja'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato(), true) : null;
+        $caja = $id > 0 ? $this->caja($id, true) : null;
         if (!$caja || $caja['delete_caja'] === null) {
             $this->json(['success' => false, 'message' => 'La caja no está en la papelera.']);
         }
@@ -251,18 +241,14 @@ class Cajas_controller {
         }
     }
 
-    /** POST id_caja + monto_inicial -> abre un turno de caja para el usuario de la sesión. */
     public function abrir() {
         $this->acceso(true);
         $this->soloPost();
 
         $id = intval($_POST['id_caja'] ?? 0);
-        $caja = $id > 0 ? $this->cajasModel->obtenerCaja($id, $this->idSindicato()) : null;
+        $caja = $id > 0 ? $this->caja($id) : null;
         if (!$caja) {
             $this->json(['success' => false, 'message' => 'La caja no existe o fue eliminada.']);
-        }
-        if ((int)$caja['id_sucursal'] !== (int)($_SESSION['id_sucursal'] ?? 0)) {
-            $this->json(['success' => false, 'message' => 'Solo puede aperturar cajas de su propia sucursal.']);
         }
 
         $monto = ValidarCajas::monto($_POST['monto_inicial'] ?? '');
@@ -283,19 +269,12 @@ class Cajas_controller {
         }
     }
 
-    /** POST id_historial + monto_declarado -> arqueo y cierre del turno. */
     public function cerrar() {
         $this->acceso(true);
         $this->soloPost();
 
         $idH = intval($_POST['id_historial'] ?? 0);
-        $turno = $idH > 0 ? $this->cajasModel->obtenerHistorial($idH, $this->idSindicato()) : null;
-        if (!$turno) {
-            $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
-        }
-        if ((int)$turno['id_usuario'] !== $this->idUsuario() && (int)($_SESSION['es_principal'] ?? 0) !== 1) {
-            $this->json(['success' => false, 'message' => 'Solo el cajero que abrió la caja (o el administrador) puede cerrarla.']);
-        }
+        $turno = $idH > 0 ? $this->turnoPropio($idH) : null;
 
         $declarado = ValidarCajas::monto($_POST['monto_declarado'] ?? '');
         if ($declarado === null) {
@@ -317,17 +296,109 @@ class Cajas_controller {
         }
     }
 
+    /* ---------------- Movimientos manuales ---------------- */
+
+    /** GET id = id_historial_caja -> movimientos del turno + totales. */
+    public function detalleMovimientos() {
+        $this->acceso(true);
+
+        $idH = intval($_GET['id'] ?? 0);
+        $turno = $idH > 0 ? $this->turno($idH) : null;
+        if (!$turno) {
+            $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
+        }
+
+        $this->json([
+            'success'     => true,
+            'caja'        => $turno['nombre_caja'] . ' · ' . $turno['nombre_sucursal'],
+            'abierta'     => (int)$turno['abierta'] === 1,
+            'movimientos' => $this->cajasModel->getMovimientos($idH),
+        ]);
+    }
+
+    /** POST id_historial + tipo (ingreso|egreso) + monto + concepto. */
+    public function guardarMovimiento() {
+        $this->acceso(true);
+        $this->soloPost();
+
+        $idH = intval($_POST['id_historial'] ?? 0);
+        $this->turnoPropio($idH);
+
+        $tipo     = ($_POST['tipo'] ?? '') === 'ingreso' ? 1 : (($_POST['tipo'] ?? '') === 'egreso' ? 0 : null);
+        $monto    = ValidarCajas::monto($_POST['monto'] ?? '');
+        $concepto = trim(preg_replace('/\s+/u', ' ', (string)($_POST['concepto'] ?? '')));
+
+        if ($tipo === null) {
+            $this->json(['success' => false, 'message' => 'Seleccione si es ingreso o egreso.']);
+        }
+        if ($monto === null || $monto <= 0) {
+            $this->json(['success' => false, 'message' => 'Indique un monto mayor a 0.']);
+        }
+        $largo = mb_strlen($concepto, 'UTF-8');
+        if ($largo < 3 || $largo > 200) {
+            $this->json(['success' => false, 'message' => 'El concepto debe tener entre 3 y 200 caracteres.']);
+        }
+
+        try {
+            $this->cajasModel->crearMovimiento($idH, $tipo, $monto, $concepto);
+            $this->json(['success' => true, 'message' => 'Movimiento registrado.']);
+        } catch (PDOException $e) {
+            $this->errorBd($e, 'guardarMovimiento');
+        } catch (Exception $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /** POST id_movimiento + id_historial. */
+    public function anularMovimiento() {
+        $this->acceso(true);
+        $this->soloPost();
+
+        $idH  = intval($_POST['id_historial'] ?? 0);
+        $idM  = intval($_POST['id_movimiento'] ?? 0);
+        $this->turnoPropio($idH);
+
+        try {
+            if ($idM <= 0 || !$this->cajasModel->anularMovimiento($idM, $idH)) {
+                $this->json(['success' => false, 'message' => 'El movimiento no existe o ya fue anulado.']);
+            }
+            $this->json(['success' => true, 'message' => 'Movimiento anulado.']);
+        } catch (PDOException $e) {
+            $this->errorBd($e, 'anularMovimiento');
+        } catch (Exception $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     /* ============================ PRIVADOS ============================ */
 
-    private function idSindicato() {
-        return (int)($_SESSION['id_sindicato'] ?? 0);
+    private function idSindicato() { return (int)($_SESSION['id_sindicato'] ?? 0); }
+    private function idSucursal()  { return (int)($_SESSION['id_sucursal'] ?? 0); }
+    private function idUsuario()   { return (int)($_SESSION['id_usuario'] ?? 0); }
+
+    /** Caja del sindicato Y de la sucursal del usuario. */
+    private function caja($id, $incluirEliminadas = false) {
+        return $this->cajasModel->obtenerCaja($id, $this->idSindicato(), $incluirEliminadas, $this->idSucursal());
     }
 
-    private function idUsuario() {
-        return (int)($_SESSION['id_usuario'] ?? 0);
+    /** Turno de una caja de la sucursal del usuario (o null). */
+    private function turno($id) {
+        $t = $this->cajasModel->obtenerHistorial($id, $this->idSindicato());
+        return ($t && (int)$t['id_sucursal'] === $this->idSucursal()) ? $t : null;
     }
 
-    /** Sesión iniciada. $json = true responde JSON (AJAX); false redirige (vistas). */
+    /** Turno ABIERTO que el usuario puede operar (cajero que lo abrió o administrador). Responde JSON si no. */
+    private function turnoPropio($idH) {
+        $t = $idH > 0 ? $this->turno($idH) : null;
+        if (!$t) {
+            $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
+        }
+        if ((int)$t['id_usuario'] !== $this->idUsuario() && (int)($_SESSION['es_principal'] ?? 0) !== 1) {
+            $this->json(['success' => false, 'message' => 'Solo el cajero que abrió la caja (o el administrador) puede operarla.']);
+        }
+        return $t;
+    }
+
     private function acceso($json) {
         if (empty($_SESSION['id_usuario'])) {
             if ($json) {
@@ -348,7 +419,6 @@ class Cajas_controller {
         return 'Ya existe una caja con ese nombre en la sucursal.' . ($dup['eliminado'] ? ' Está en la papelera: restáurela desde allí.' : '');
     }
 
-    /** 1062 = clave duplicada. Nunca se expone el SQL al cliente. */
     private function errorBd(PDOException $e, $accion) {
         if ((int)($e->errorInfo[1] ?? 0) === 1062) {
             $this->json(['success' => false, 'message' => 'Ya existe una caja con ese nombre en la sucursal.']);

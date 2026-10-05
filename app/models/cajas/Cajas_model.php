@@ -1,17 +1,9 @@
 <?php
 /**
  * Cajas_model
- * CRUD de cajas con borrado suave (delete_caja + estado_caja = 0) y turnos de caja
- * (historiales_cajas: apertura / arqueo / cierre).
- *
- * Notas de la BD:
- *  - UK_sucursal_caja (id_sucursal, nombre_caja) cuenta también las cajas eliminadas:
- *    los duplicados NO filtran delete_caja y se recupera desde la papelera.
- *  - cajas no tiene sindicato propio: se filtra por sucursales.id_sindicato.
- *  - Turno abierto = estado_historial_caja = 1 AND fecha_cierre IS NULL.
- *  - Monto del sistema = inicial + pasajes + encomiendas pagadas en origen + cobros COD
- *    (entregas) + ingresos manuales - egresos manuales, todo por id_historial_caja.
- * Las lecturas devuelven [] / null ante error; las escrituras dejan subir la excepción.
+ * CRUD de cajas con borrado suave, turnos de caja (historiales_cajas) y movimientos manuales
+ * (movimientos_cajas: ingreso = 1, egreso = 0).
+ * Todo se filtra por sindicato y, cuando se indica, por la sucursal del usuario.
  */
 class Cajas_model {
     private $pdo;
@@ -22,6 +14,11 @@ class Cajas_model {
         if ($this->pdo) {
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         }
+    }
+
+    /** Filtro opcional por sucursal (entero ya saneado). */
+    private function suc($id_sucursal, $col = 'c.id_sucursal') {
+        return (int)$id_sucursal > 0 ? " AND $col = " . (int)$id_sucursal : '';
     }
 
     private function baseSelect() {
@@ -55,11 +52,11 @@ class Cajas_model {
 
     /* ---------------- Lecturas ---------------- */
 
-    public function getCajas($id_sindicato) {
+    public function getCajas($id_sindicato, $id_sucursal = 0) {
         try {
             $st = $this->pdo->prepare($this->baseSelect() .
-                "WHERE s.id_sindicato = :s AND c.delete_caja IS NULL
-                 ORDER BY s.ciudad_sucursal ASC, c.nombre_caja ASC");
+                "WHERE s.id_sindicato = :s AND c.delete_caja IS NULL" . $this->suc($id_sucursal) .
+                " ORDER BY s.ciudad_sucursal ASC, c.nombre_caja ASC");
             $st->execute([':s' => $id_sindicato]);
             return $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -68,11 +65,11 @@ class Cajas_model {
         }
     }
 
-    public function getEliminadas($id_sindicato) {
+    public function getEliminadas($id_sindicato, $id_sucursal = 0) {
         try {
             $st = $this->pdo->prepare($this->baseSelect() .
-                "WHERE s.id_sindicato = :s AND c.delete_caja IS NOT NULL
-                 ORDER BY c.delete_caja DESC");
+                "WHERE s.id_sindicato = :s AND c.delete_caja IS NOT NULL" . $this->suc($id_sucursal) .
+                " ORDER BY c.delete_caja DESC");
             $st->execute([':s' => $id_sindicato]);
             return $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -81,12 +78,12 @@ class Cajas_model {
         }
     }
 
-    public function contarEliminadas($id_sindicato) {
+    public function contarEliminadas($id_sindicato, $id_sucursal = 0) {
         try {
             $st = $this->pdo->prepare(
                 "SELECT COUNT(*) FROM cajas c
                  INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
-                 WHERE s.id_sindicato = :s AND c.delete_caja IS NOT NULL"
+                 WHERE s.id_sindicato = :s AND c.delete_caja IS NOT NULL" . $this->suc($id_sucursal)
             );
             $st->execute([':s' => $id_sindicato]);
             return (int)$st->fetchColumn();
@@ -95,9 +92,9 @@ class Cajas_model {
         }
     }
 
-    public function obtenerCaja($id, $id_sindicato, $incluirEliminadas = false) {
+    public function obtenerCaja($id, $id_sindicato, $incluirEliminadas = false, $id_sucursal = 0) {
         try {
-            $sql = $this->baseSelect() . "WHERE c.id_caja = :id AND s.id_sindicato = :s";
+            $sql = $this->baseSelect() . "WHERE c.id_caja = :id AND s.id_sindicato = :s" . $this->suc($id_sucursal);
             if (!$incluirEliminadas) $sql .= " AND c.delete_caja IS NULL";
             $st = $this->pdo->prepare($sql . " LIMIT 1");
             $st->execute([':id' => $id, ':s' => $id_sindicato]);
@@ -108,13 +105,14 @@ class Cajas_model {
         }
     }
 
-    /** Sucursales vigentes del sindicato (para el select del formulario). */
-    public function getSucursales($id_sindicato) {
+    /** Sucursales vigentes del sindicato (opcionalmente solo la del usuario). */
+    public function getSucursales($id_sindicato, $id_sucursal = 0) {
         try {
             $st = $this->pdo->prepare(
                 "SELECT id_sucursal, ciudad_sucursal, nombre_sucursal FROM sucursales
-                 WHERE id_sindicato = :s AND (estado_sucursal = 1 OR estado_sucursal IS NULL) AND delete_sucursal IS NULL
-                 ORDER BY ciudad_sucursal ASC, nombre_sucursal ASC"
+                 WHERE id_sindicato = :s AND (estado_sucursal = 1 OR estado_sucursal IS NULL) AND delete_sucursal IS NULL"
+                . $this->suc($id_sucursal, 'id_sucursal') .
+                " ORDER BY ciudad_sucursal ASC, nombre_sucursal ASC"
             );
             $st->execute([':s' => $id_sindicato]);
             return $st->fetchAll(PDO::FETCH_ASSOC);
@@ -133,7 +131,6 @@ class Cajas_model {
         return (int)$st->fetchColumn() > 0;
     }
 
-    /** ¿Ya existe una caja (vigente O eliminada) con ese nombre en la sucursal? */
     public function nombreDuplicado($id_sucursal, $nombre, $excluirId = 0) {
         $st = $this->pdo->prepare(
             "SELECT delete_caja FROM cajas
@@ -153,7 +150,6 @@ class Cajas_model {
         return (int)$st->fetchColumn() > 0;
     }
 
-    /** id_historial_caja del turno abierto del usuario (o 0). Útil para enlazar ventas a la caja. */
     public function idHistorialAbiertoDeUsuario($id_usuario) {
         try {
             $st = $this->pdo->prepare(
@@ -169,7 +165,6 @@ class Cajas_model {
         }
     }
 
-    /** Últimos turnos de la caja (para el detalle). */
     public function getHistorial($id_caja, $limite = 10) {
         try {
             $st = $this->pdo->prepare(
@@ -190,12 +185,12 @@ class Cajas_model {
         }
     }
 
-    /** Un turno con su caja, sucursal y cajero; restringido al sindicato. */
+    /** Un turno con su caja (incluye id_sucursal), sucursal y cajero; restringido al sindicato. */
     public function obtenerHistorial($id_historial, $id_sindicato) {
         try {
             $st = $this->pdo->prepare(
                 "SELECT h.*, CAST(IFNULL(h.estado_historial_caja, 0) AS UNSIGNED) AS abierta,
-                        c.nombre_caja, s.nombre_sucursal, s.ciudad_sucursal,
+                        c.nombre_caja, c.id_sucursal, s.nombre_sucursal, s.ciudad_sucursal,
                         TRIM(CONCAT(IFNULL(pe.nombre_persona,''), ' ', IFNULL(pe.apellido_paterno_persona,''))) AS cajero
                  FROM historiales_cajas h
                  INNER JOIN cajas c ON h.id_caja = c.id_caja
@@ -271,7 +266,6 @@ class Cajas_model {
         return (int)$this->pdo->lastInsertId();
     }
 
-    /** La sucursal es parte de la identidad de la caja: solo se edita el nombre. */
     public function actualizar($id, $nombre) {
         $st = $this->pdo->prepare(
             "UPDATE cajas SET nombre_caja = :n, update_caja = NOW() WHERE id_caja = :id AND delete_caja IS NULL"
@@ -311,7 +305,6 @@ class Cajas_model {
 
     /* ---------------- Turnos de caja ---------------- */
 
-    /** Abre un turno. Una caja y un usuario solo pueden tener UN turno abierto. */
     public function abrir($id_caja, $id_usuario, $monto) {
         $this->pdo->beginTransaction();
         try {
@@ -346,10 +339,6 @@ class Cajas_model {
         }
     }
 
-    /**
-     * Cierra el turno (arqueo): guarda monto del sistema, declarado y diferencia.
-     * @return array ['sistema' => float, 'diferencia' => float]
-     */
     public function cerrar($id_historial, $declarado) {
         $this->pdo->beginTransaction();
         try {
@@ -379,6 +368,63 @@ class Cajas_model {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $e;
         }
+    }
+
+    /* ---------------- Movimientos manuales ---------------- */
+
+    private function turnoAbierto($id_historial) {
+        $st = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM historiales_cajas
+             WHERE id_historial_caja = :h AND estado_historial_caja = 1 AND fecha_cierre IS NULL AND delete_historial_caja IS NULL"
+        );
+        $st->execute([':h' => $id_historial]);
+        return (int)$st->fetchColumn() > 0;
+    }
+
+    /** Movimientos vigentes del turno, el más reciente primero. tipo: 1 ingreso, 0 egreso. */
+    public function getMovimientos($id_historial) {
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT m.id_movimiento_caja, CAST(m.tipo_movimiento_caja AS UNSIGNED) AS tipo,
+                        m.monto_movimiento_caja AS monto, m.concepto_movimiento_caja AS concepto, m.create_movimiento_caja AS fecha
+                 FROM movimientos_cajas m
+                 WHERE m.id_historial_caja = :h AND m.delete_movimiento_caja IS NULL
+                   AND (m.estado_movimiento_caja = 1 OR m.estado_movimiento_caja IS NULL)
+                 ORDER BY m.id_movimiento_caja DESC"
+            );
+            $st->execute([':h' => $id_historial]);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('Cajas_model::getMovimientos: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /** Registra un ingreso (1) o egreso (0) en un turno abierto. */
+    public function crearMovimiento($id_historial, $tipo, $monto, $concepto) {
+        if (!$this->turnoAbierto($id_historial)) throw new Exception('El turno de caja ya está cerrado.');
+        $st = $this->pdo->prepare(
+            "INSERT INTO movimientos_cajas
+                (id_historial_caja, tipo_movimiento_caja, monto_movimiento_caja, concepto_movimiento_caja, estado_movimiento_caja, create_movimiento_caja)
+             VALUES (:h, :t, :m, :c, 1, NOW())"
+        );
+        $st->bindValue(':h', (int)$id_historial, PDO::PARAM_INT);
+        $st->bindValue(':t', (int)$tipo, PDO::PARAM_INT);
+        $st->bindValue(':m', $monto);
+        $st->bindValue(':c', $concepto, PDO::PARAM_STR);
+        $st->execute();
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    /** Baja suave de un movimiento (solo mientras el turno siga abierto). */
+    public function anularMovimiento($id_movimiento, $id_historial) {
+        if (!$this->turnoAbierto($id_historial)) throw new Exception('El turno de caja ya está cerrado.');
+        $st = $this->pdo->prepare(
+            "UPDATE movimientos_cajas SET delete_movimiento_caja = NOW(), estado_movimiento_caja = 0, update_movimiento_caja = NOW()
+             WHERE id_movimiento_caja = :id AND id_historial_caja = :h AND delete_movimiento_caja IS NULL"
+        );
+        $st->execute([':id' => $id_movimiento, ':h' => $id_historial]);
+        return $st->rowCount() > 0;
     }
 }
 ?>
