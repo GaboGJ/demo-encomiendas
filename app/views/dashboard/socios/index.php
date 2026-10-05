@@ -15,6 +15,7 @@
     ['Inactivos',          $inactivos . ' Inactivos', 'block',         'bg-gradient-warning', 'shadow-warning', 'text-dark'],
     ['Vehículos Titulares', $vehiculos . ' Unidades', 'directions_bus','bg-gradient-dark',    'shadow-dark',    'text-dark'],
   ];
+  $thBase = 'text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 border-top border-bottom border-light';
 ?>
 <div class="container-fluid py-3 flex-grow-1">
   <div class="row mb-4">
@@ -37,8 +38,8 @@
     <div class="card border-0 shadow-sm border-radius-xl overflow-hidden mb-4">
       <div class="card-header bg-white p-4 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3">
         <div>
-          <h5 class="font-weight-bolder text-dark mb-0">Socios del Sindicato</h5>
-          <p class="text-xs text-secondary mb-0">Afiliados, código, licencia de conducir y vehículos de los que son titulares</p>
+          <h5 class="font-weight-bolder text-dark mb-0"><?= $esPrincipal ? 'Socios de los Sindicatos' : 'Socios del Sindicato' ?></h5>
+          <p class="text-xs text-secondary mb-0">Afiliados, sindicato al que pertenecen, código, licencia de conducir y vehículos de los que son titulares</p>
         </div>
         <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto">
           <a href="<?= rtrim(URL, '/') ?>/socios/papelera" class="btn btn-outline-secondary mb-0 border-radius-md px-3 d-inline-flex align-items-center justify-content-center gap-2">
@@ -56,12 +57,13 @@
       <div class="card-body px-0 pt-0 pb-2"><div class="table-responsive p-0">
         <table id="datatable-socios" class="table table-borderless align-items-center mb-0 w-100">
           <thead><tr>
-            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 ps-4 ps-md-5 pe-4 border-top border-bottom border-light">Socio / C.I.</th>
-            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Código / Afiliación</th>
-            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Licencia</th>
-            <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Vehículos</th>
-            <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Estado</th>
-            <th class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 pe-4 pe-md-5 ps-4 border-top border-bottom border-light">Acciones</th>
+            <th class="<?= $thBase ?> ps-4 ps-md-5 pe-4">Socio / C.I.</th>
+            <th class="<?= $thBase ?> px-3">Sindicato</th>
+            <th class="<?= $thBase ?> px-3">Código / Afiliación</th>
+            <th class="<?= $thBase ?> px-3">Licencia</th>
+            <th class="<?= $thBase ?> text-center px-3">Vehículos</th>
+            <th class="<?= $thBase ?> text-center px-3">Estado</th>
+            <th class="<?= $thBase ?> text-end pe-4 pe-md-5 ps-4">Acciones</th>
           </tr></thead>
           <tbody>
           <?php foreach ($socios as $s): ?>
@@ -79,6 +81,13 @@
                     <span class="text-xxs text-secondary font-weight-bold">C.I. <?= $h($s['carnet_persona']) ?> · Cel: <?= $h($s['telefono_persona']) ?></span>
                   </div>
                 </div>
+              </td>
+              <td class="py-3 px-3 align-middle">
+                <span class="text-xs font-weight-bold text-dark"><?= $h($s['nombre_sindicato']) ?></span>
+                <span class="d-block text-xxs text-secondary font-weight-bold">
+                  <?= $s['sigla_sindicato'] ? $h($s['sigla_sindicato']) : 'Sin sigla' ?>
+                  <?php if ((int)$s['sindicato_principal'] === 1): ?><span class="badge badge-sm bg-gradient-dark border-radius-pill ms-1">Principal</span><?php endif; ?>
+                </span>
               </td>
               <td class="py-3 px-3 align-middle">
                 <span class="text-xs font-weight-bold text-dark"><?= $h($s['codigo_socio'] ?: '-') ?></span>

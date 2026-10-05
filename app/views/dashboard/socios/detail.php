@@ -15,6 +15,10 @@
         <span class="badge badge-sm bg-gradient-success border-radius-pill mt-1" id="detSocEstado">-</span>
       </div>
       <div class="row g-3 mb-3">
+        <div class="col-12"><div class="p-3 bg-gray-100 border-radius-md">
+          <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block">Sindicato</span>
+          <p class="text-xs font-weight-bold text-dark mb-0" id="detSocSindicato">-</p>
+        </div></div>
         <div class="col-6"><div class="p-3 bg-gray-100 border-radius-md h-100">
           <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block">Código de socio</span>
           <p class="text-xs font-weight-bold text-dark mb-0" id="detSocCodigo">-</p>
@@ -61,6 +65,7 @@ function verDetalleSocio(idSocio) {
 
       setTxt('detSocIniciales', ((d.nombre_persona || '').charAt(0) + (d.apellido_paterno_persona || '').charAt(0)).toUpperCase());
       setTxt('detSocNombre', d.nombre_completo);
+      setTxt('detSocSindicato', d.nombre_sindicato + (d.sigla_sindicato ? ' (' + d.sigla_sindicato + ')' : ''));
       setTxt('detSocCodigo', d.codigo_socio);
       setTxt('detSocAfiliacion', fecha(d.fecha_afiliacion_socio));
       setTxt('detSocCi', d.carnet_persona);

@@ -10,7 +10,9 @@ require_once __DIR__ . '/../../helpers/socios/ValidarSocios.php';
  *
  * Un socio SIEMPRE es también chofer: guardar() escribe personas -> socios -> choferes
  * en una sola transacción, reutilizando la persona y el chofer si ya existían.
- * (Lo contrario no aplica: un chofer puede no ser socio.)
+ *
+ * Alcance: el sindicato principal ve y administra socios de TODOS los sindicatos y puede
+ * elegir el sindicato; los demás solo ven y registran en el suyo.
  */
 class Socios_controller {
     private $sociosModel, $choferesModel, $personasModel;
@@ -27,31 +29,32 @@ class Socios_controller {
     public function index() {
         $this->acceso(false);
         $this->vista('socios/index', [
-            'socios'        => $this->sociosModel->getSocios($this->idSindicato()),
-            'totalPapelera' => $this->sociosModel->contarEliminados($this->idSindicato()),
+            'socios'        => $this->sociosModel->getSocios($this->alcance()),
+            'totalPapelera' => $this->sociosModel->contarEliminados($this->alcance()),
+            'esPrincipal'   => $this->esPrincipal(),
         ]);
     }
 
     public function new() {
         $this->acceso(false);
-        $this->vista('socios/new', []);
+        $this->vista('socios/new', $this->datosFormulario());
     }
 
     public function update() {
         $this->acceso(false);
         $id = intval($_GET['id'] ?? 0);
-        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->idSindicato()) : null;
+        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->alcance()) : null;
         if (!$socio) {
             Flash::set(false, 'El socio no existe o fue eliminado.', 'Socio no encontrado');
             header('Location: ' . rtrim(URL, '/') . '/socios');
             exit;
         }
-        $this->vista('socios/update', ['socio' => $socio]);
+        $this->vista('socios/update', $this->datosFormulario() + ['socio' => $socio]);
     }
 
     public function papelera() {
         $this->acceso(false);
-        $this->vista('socios/papelera', ['eliminados' => $this->sociosModel->getEliminados($this->idSindicato())]);
+        $this->vista('socios/papelera', ['eliminados' => $this->sociosModel->getEliminados($this->alcance())]);
     }
 
     /* ============================ AJAX / JSON ============================ */
@@ -59,7 +62,7 @@ class Socios_controller {
     public function detalle() {
         $this->acceso(true);
         $id = intval($_GET['id'] ?? 0);
-        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->idSindicato()) : null;
+        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->alcance()) : null;
         if (!$socio) $this->json(['success' => false, 'message' => 'El socio no existe o fue eliminado.']);
         $this->json(['success' => true, 'data' => $socio]);
     }
@@ -98,6 +101,12 @@ class Socios_controller {
         $error = ValidarSocios::validar($d);
         if ($error !== null) $this->json(['success' => false, 'message' => $error]);
 
+        // Sindicato: el principal elige; los demás siempre el suyo
+        $idSindicato = $this->esPrincipal() ? intval($_POST['id_sindicato'] ?? 0) : $this->idSindicato();
+        if ($idSindicato <= 0 || !$this->sociosModel->sindicatoValido($idSindicato)) {
+            $this->json(['success' => false, 'message' => 'Seleccione un sindicato válido (existente y activo).']);
+        }
+
         global $pdo;
         try {
             $pdo->beginTransaction();
@@ -126,7 +135,7 @@ class Socios_controller {
             // El socio también es chofer (se reutiliza si la persona ya lo era)
             $this->asegurarChofer($idPersona, $d);
 
-            $this->sociosModel->crear($idPersona, $this->idSindicato(), $d);
+            $this->sociosModel->crear($idPersona, $idSindicato, $d);
             $pdo->commit();
 
             Flash::set(true, 'El socio ' . $d['nombres'] . ' ' . $d['paterno'] . ' (' . $d['codigo'] . ') fue registrado correctamente.', 'Socio Registrado');
@@ -146,14 +155,28 @@ class Socios_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_socio'] ?? 0);
-        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->idSindicato()) : null;
+        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->alcance()) : null;
         if (!$socio) $this->json(['success' => false, 'message' => 'El socio no existe o fue eliminado.']);
 
         $d = ValidarSocios::normalizar($_POST);
-        $d['ci'] = $socio['carnet_persona']; // el C.I. no se modifica
+        if ($d['ci'] === '') $d['ci'] = $socio['carnet_persona'];       // si no llega, se conserva
         if ($d['codigo'] === '') $d['codigo'] = $socio['codigo_socio'];
         $error = ValidarSocios::validar($d);
         if ($error !== null) $this->json(['success' => false, 'message' => $error]);
+
+        // Sindicato: el principal puede cambiarlo; los demás conservan el actual
+        $idSindicato = $this->esPrincipal() ? intval($_POST['id_sindicato'] ?? 0) : (int)$socio['id_sindicato'];
+        if ($idSindicato <= 0) $idSindicato = (int)$socio['id_sindicato'];
+        if ($idSindicato !== (int)$socio['id_sindicato']) {
+            if (!$this->sociosModel->sindicatoValido($idSindicato)) {
+                $this->json(['success' => false, 'message' => 'El sindicato seleccionado no existe o está inactivo.']);
+            }
+            if ((int)$socio['total_vehiculos'] > 0) {
+                $this->json(['success' => false, 'message' =>
+                    'No se puede cambiar de sindicato: el socio es titular de ' . (int)$socio['total_vehiculos'] . ' vehículo(s). Reasígnelos primero.']);
+            }
+        }
+        $d['id_sindicato'] = $idSindicato;
 
         global $pdo;
         try {
@@ -161,6 +184,16 @@ class Socios_controller {
             if ($dup) $this->json(['success' => false, 'message' => $this->mensajeCodigoDuplicado($dup)]);
 
             $pdo->beginTransaction();
+
+            // C.I. editable: no puede pertenecer a OTRA persona
+            if (strcasecmp($d['ci'], (string)$socio['carnet_persona']) !== 0) {
+                $otra = $this->personasModel->buscarPorCi($d['ci']);
+                if ($otra && (int)$otra['id_persona'] !== (int)$socio['id_persona']) {
+                    throw new Exception('Ya existe otra persona registrada con ese C.I.');
+                }
+                $this->sociosModel->actualizarCarnet($socio['id_persona'], $d['ci']);
+            }
+
             $this->choferesModel->actualizarPersona($socio['id_persona'], $d);
             $this->asegurarChofer((int)$socio['id_persona'], $d);
             $this->sociosModel->actualizar($id, $d);
@@ -184,7 +217,7 @@ class Socios_controller {
 
         $id     = intval($_POST['id_socio'] ?? 0);
         $estado = intval($_POST['estado'] ?? 0) === 1 ? 1 : 0;
-        if ($id <= 0 || !$this->sociosModel->obtenerSocio($id, $this->idSindicato())) {
+        if ($id <= 0 || !$this->sociosModel->obtenerSocio($id, $this->alcance())) {
             $this->json(['success' => false, 'message' => 'El socio no existe o fue eliminado.']);
         }
         try {
@@ -201,7 +234,7 @@ class Socios_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_socio'] ?? 0);
-        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->idSindicato()) : null;
+        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->alcance()) : null;
         if (!$socio) $this->json(['success' => false, 'message' => 'No se pudo eliminar: el socio no existe o ya fue eliminado.']);
 
         $veh = (int)$socio['total_vehiculos'];
@@ -224,7 +257,7 @@ class Socios_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_socio'] ?? 0);
-        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->idSindicato(), true) : null;
+        $socio = $id > 0 ? $this->sociosModel->obtenerSocio($id, $this->alcance(), true) : null;
         if (!$socio || $socio['delete_socio'] === null) {
             $this->json(['success' => false, 'message' => 'El socio no está en la papelera.']);
         }
@@ -261,6 +294,18 @@ class Socios_controller {
     }
 
     private function idSindicato() { return (int)($_SESSION['id_sindicato'] ?? 0); }
+    private function esPrincipal() { return (int)($_SESSION['es_principal'] ?? 0) === 1; }
+
+    /** 0 = todos los sindicatos (principal); si no, el sindicato de la sesión. */
+    private function alcance() { return $this->esPrincipal() ? 0 : $this->idSindicato(); }
+
+    private function datosFormulario() {
+        return [
+            'sindicatos'  => $this->sociosModel->getSindicatosActivos($this->esPrincipal() ? 0 : $this->idSindicato()),
+            'esPrincipal' => $this->esPrincipal(),
+            'idSindicatoSesion' => $this->idSindicato(),
+        ];
+    }
 
     private function acceso($json) {
         if (empty($_SESSION['id_usuario'])) {
@@ -284,7 +329,7 @@ class Socios_controller {
 
     private function errorBd(PDOException $e, $accion) {
         if ((int)($e->errorInfo[1] ?? 0) === 1062) {
-            $this->json(['success' => false, 'message' => 'Ya existe un socio o chofer con ese código, licencia o persona.']);
+            $this->json(['success' => false, 'message' => 'Ya existe un socio, chofer o persona con ese código, licencia o C.I.']);
         }
         error_log('Socios ' . $accion . ': ' . $e->getMessage());
         $this->json(['success' => false, 'message' => 'Error de base de datos. Intente nuevamente o revise el log de PHP.']);

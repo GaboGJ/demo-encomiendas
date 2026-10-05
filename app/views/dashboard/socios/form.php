@@ -1,14 +1,19 @@
 <?php
-/** Compartido por new.php y update.php. Variables: $modo ('nuevo'|'editar') y $soc. */
+/**
+ * Compartido por new.php y update.php.
+ * Variables: $modo ('nuevo'|'editar'), $soc, $sindicatos, $esPrincipal, $idSindicatoSesion.
+ */
 $h         = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
 $esEdicion = ($modo ?? 'nuevo') === 'editar';
 $val       = function ($c) use ($soc, $h) { return $h($soc[$c] ?? ''); };
 $lleno     = function ($c) use ($soc) { return !empty($soc[$c]) ? ' is-filled' : ''; };
 $categorias = ['A' => 'A - Motocicletas', 'B' => 'B - Automóviles', 'C' => 'C - Camionetas / Minibuses', 'P' => 'P - Profesional (buses)', 'M' => 'M - Motocicletas', 'T' => 'T - Tractores'];
 $catActual = $soc['categoria_licencia_chofer'] ?? '';
+$sinActual = $esEdicion ? (int)$soc['id_sindicato'] : (int)($idSindicatoSesion ?? 0);
+$txtSind   = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['sigla_sindicato'] ? ' (' . $s['sigla_sindicato'] . ')' : '')); };
 ?>
 <div class="container-fluid py-3 py-md-4 flex-grow-1">
-  <div class="row"><div class="col-12 col-xl-10 mx-auto px-2 px-md-3">
+  <div class="row"><div class="col-12 col-xl-11 mx-auto px-2 px-md-3">
     <div class="card border-0 shadow-sm border-radius-xl">
 
       <div class="card-header bg-white p-4">
@@ -23,24 +28,21 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
           <div class="row g-3 g-md-4">
 
             <!-- DATOS PERSONALES -->
-            <div class="col-12 col-lg-6">
+            <div class="col-12 col-lg-7">
               <div class="p-3 border border-radius-md bg-white h-100">
                 <div class="d-flex align-items-center mb-3">
                   <span class="material-symbols-rounded text-success me-2">person</span>
                   <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos Personales</h6>
                 </div>
                 <div class="row g-2">
-                  <div class="col-12 col-sm-6">
+                  <div class="col-12 col-md-5">
                     <div class="input-group input-group-outline my-2<?= $lleno('carnet_persona') ?>">
                       <label class="form-label">Nº Carnet (C.I.) *</label>
-                      <?php if ($esEdicion): ?>
-                        <input type="text" class="form-control bg-gray-100" value="<?= $val('carnet_persona') ?>" readonly>
-                      <?php else: ?>
-                        <input type="text" class="form-control" name="ci" id="ci" maxlength="20" onblur="buscarPersonaPorCi()" required>
-                      <?php endif; ?>
+                      <input type="text" class="form-control text-uppercase" name="ci" id="ci" maxlength="20"
+                             value="<?= $val('carnet_persona') ?>" <?= $esEdicion ? '' : 'onblur="buscarPersonaPorCi()"' ?> required>
                     </div>
                   </div>
-                  <div class="col-12 col-sm-6">
+                  <div class="col-12 col-md-7">
                     <div class="input-group input-group-outline my-2<?= $lleno('telefono_persona') ?>">
                       <label class="form-label">Celular *</label>
                       <input type="text" class="form-control" name="celular" id="celular" maxlength="50" value="<?= $val('telefono_persona') ?>" required>
@@ -52,13 +54,13 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
                       <input type="text" class="form-control" name="nombres" id="nombres" maxlength="50" value="<?= $val('nombre_persona') ?>" required>
                     </div>
                   </div>
-                  <div class="col-12 col-sm-6">
+                  <div class="col-12 col-md-6">
                     <div class="input-group input-group-outline my-2<?= $lleno('apellido_paterno_persona') ?>">
                       <label class="form-label">Apellido Paterno *</label>
                       <input type="text" class="form-control" name="paterno" id="paterno" maxlength="50" value="<?= $val('apellido_paterno_persona') ?>" required>
                     </div>
                   </div>
-                  <div class="col-12 col-sm-6">
+                  <div class="col-12 col-md-6">
                     <div class="input-group input-group-outline my-2<?= $lleno('apellido_materno_persona') ?>">
                       <label class="form-label">Apellido Materno</label>
                       <input type="text" class="form-control" name="materno" id="materno" maxlength="50" value="<?= $val('apellido_materno_persona') ?>">
@@ -71,21 +73,41 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
                     </div>
                   </div>
                 </div>
-                <p class="text-xxs mb-0 mt-1" id="lblPersonaExistente"></p>
+                <p class="text-xxs mb-0 mt-1 <?= $esEdicion ? 'text-secondary' : '' ?>" id="lblPersonaExistente">
+                  <?= $esEdicion ? 'Si cambia el C.I. también cambia la credencial de acceso de esta persona (si tiene usuario). No puede coincidir con el de otra persona.' : '' ?>
+                </p>
               </div>
             </div>
 
-            <div class="col-12 col-lg-6">
-              <div class="row g-3 h-100">
+            <div class="col-12 col-lg-5">
+              <div class="row g-3">
 
-                <!-- AFILIACIÓN -->
+                <!-- AFILIACIÓN Y SINDICATO -->
                 <div class="col-12">
                   <div class="p-3 border border-radius-md bg-white">
                     <div class="d-flex align-items-center mb-3">
                       <span class="material-symbols-rounded text-success me-2">handshake</span>
-                      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Afiliación</h6>
+                      <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Afiliación y Sindicato</h6>
                     </div>
-                    <div class="row g-2">
+
+                    <label class="form-label text-xs font-weight-bold mb-0">Sindicato *</label>
+                    <?php if ($esPrincipal): ?>
+                      <div class="input-group input-group-outline is-filled my-1">
+                        <select class="form-control" name="id_sindicato" id="id_sindicato" required>
+                          <option value="" disabled <?= $sinActual ? '' : 'selected' ?>>Seleccione un sindicato...</option>
+                          <?php foreach ($sindicatos as $s): ?>
+                            <option value="<?= (int)$s['id_sindicato'] ?>" <?= (int)$s['id_sindicato'] === $sinActual ? 'selected' : '' ?>><?= $txtSind($s) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </div>
+                    <?php else: ?>
+                      <?php $propio = $sindicatos[0] ?? null; ?>
+                      <div class="input-group input-group-outline is-filled my-1">
+                        <input type="text" class="form-control bg-gray-100" value="<?= $propio ? $txtSind($propio) : '' ?>" readonly>
+                      </div>
+                    <?php endif; ?>
+
+                    <div class="row g-2 mt-1">
                       <div class="col-12 col-sm-6">
                         <div class="input-group input-group-outline my-2<?= $lleno('codigo_socio') ?>">
                           <label class="form-label">Código de Socio</label>
@@ -99,7 +121,7 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
                         </div>
                       </div>
                     </div>
-                    <p class="text-xxs text-secondary mb-0">Si deja el código vacío se genera automáticamente (SOC-000001…). No puede repetirse, ni con socios de la papelera.</p>
+                    <p class="text-xxs text-secondary mb-0">Código vacío = se genera solo (SOC-000001…). No puede repetirse, ni con socios de la papelera.<?= $esEdicion && $esPrincipal ? ' El sindicato solo se puede cambiar si el socio no tiene vehículos.' : '' ?></p>
                   </div>
                 </div>
 
@@ -120,7 +142,7 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
                         </div>
                       </div>
                       <div class="col-12 col-sm-6">
-                        <label class="form-label text-xs font-weight-bold mb-0 mt-2">Categoría</label>
+                        <label class="form-label text-xs font-weight-bold mb-0 mt-1">Categoría</label>
                         <div class="input-group input-group-outline is-filled my-1">
                           <select class="form-control" name="categoria" id="categoria">
                             <option value="">Sin categoría</option>
@@ -131,7 +153,7 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
                         </div>
                       </div>
                       <div class="col-12 col-sm-6">
-                        <label class="form-label text-xs font-weight-bold mb-0 mt-2">Vencimiento</label>
+                        <label class="form-label text-xs font-weight-bold mb-0 mt-1">Vencimiento</label>
                         <div class="input-group input-group-outline is-filled my-1">
                           <input type="date" class="form-control" name="vencimiento" id="vencimiento" value="<?= $val('vencimiento_licencia_chofer') ?>">
                         </div>
@@ -170,6 +192,7 @@ $catActual = $soc['categoria_licencia_chofer'] ?? '';
 
   $('licencia').addEventListener('input', function () { this.value = this.value.toUpperCase(); });
   $('codigo_socio').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/\s+/g, ''); });
+  $('ci').addEventListener('input', function () { this.value = this.value.toUpperCase().replace(/\s+/g, ''); });
 
   function llenar(id, valor) {
     const el = $(id);
