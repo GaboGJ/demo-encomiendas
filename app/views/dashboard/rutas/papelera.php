@@ -37,6 +37,7 @@
                     <td class="py-3 ps-4 ps-md-5 pe-4">
                       <h6 class="mb-0 text-sm font-weight-bold text-dark"><?= $h($r['ciudad_origen']) ?> ➔ <?= $h($r['ciudad_destino']) ?></h6>
                       <span class="text-xxs text-secondary font-weight-bold"><?= $h($r['nombre_origen']) ?> · <?= $h($r['nombre_destino']) ?></span>
+                      <span class="d-block text-xxs text-success font-weight-bold">Sind. <?= $h($r['nombre_sindicato']) ?></span>
                     </td>
                     <td class="align-middle text-center py-3 px-3">
                       <span class="text-xs font-weight-bold text-dark">Bs. <?= number_format($r['base_precio_pasaje'], 2) ?></span>

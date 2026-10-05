@@ -4,14 +4,11 @@ require_once __DIR__ . '/../../helpers/rutas/ValidarRutas.php';
 
 /**
  * Módulo Rutas y Tarifarios.
- * Rutas (router: /carpeta/accion):
- *   /rutas                  index       listado
- *   /rutas/new              new         formulario nuevo
- *   /rutas/update?id=X      update      formulario de edición
- *   /rutas/papelera         papelera    rutas eliminadas (borrado suave)
+ *   /rutas · /rutas/new · /rutas/update?id=X · /rutas/papelera
  *   AJAX/JSON: detalle (GET) · guardar · actualizar · cambiarEstado · eliminar · restaurar (POST)
  *
- * Todo se filtra por el sindicato de la sesión (origen -> sucursales.id_sindicato).
+ * El origen es siempre la sucursal del usuario. La ruta pertenece a un sindicato elegido
+ * (el principal elige cualquiera; los demás solo el suyo).
  */
 class Rutas_controller {
     private $rutasModel;
@@ -51,7 +48,7 @@ class Rutas_controller {
 
         $this->vista('rutas/update', $this->datosFormulario() + [
             'ruta'    => $ruta,
-            'tarifas' => $this->rutasModel->getTarifas($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino']),
+            'tarifas' => $this->rutasModel->getTarifas($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato']),
         ]);
     }
 
@@ -71,7 +68,7 @@ class Rutas_controller {
             $this->json(['success' => false, 'message' => 'La ruta no existe o fue eliminada.']);
         }
 
-        $ruta['tarifas'] = $this->rutasModel->getTarifas($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino']);
+        $ruta['tarifas'] = $this->rutasModel->getTarifas($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato']);
         $this->json(['success' => true, 'data' => $ruta]);
     }
 
@@ -80,16 +77,21 @@ class Rutas_controller {
         $this->soloPost();
 
         $d = ValidarRutas::normalizar($_POST);
+        $d['id_origen'] = $this->idSucursal(); // siempre la sucursal del usuario
+        if (!$this->esPrincipal()) $d['id_sindicato'] = $this->idSindicato();
         $this->validarDatos($d);
 
         try {
             if (!$this->rutasModel->origenPerteneceASindicato($d['id_origen'], $this->idSindicato())) {
-                $this->json(['success' => false, 'message' => 'La sucursal de origen no pertenece a su sindicato o está inactiva.']);
+                $this->json(['success' => false, 'message' => 'Su sucursal no pertenece a su sindicato o está inactiva.']);
             }
             if (!$this->rutasModel->destinoValido($d['id_destino'])) {
                 $this->json(['success' => false, 'message' => 'La sucursal de destino no existe o está inactiva.']);
             }
-            $dup = $this->rutasModel->buscarDuplicado($d['id_origen'], $d['id_destino']);
+            if (!$this->rutasModel->sindicatoValido($d['id_sindicato'])) {
+                $this->json(['success' => false, 'message' => 'El sindicato seleccionado no existe o está inactivo.']);
+            }
+            $dup = $this->rutasModel->buscarDuplicado($d['id_origen'], $d['id_destino'], $d['id_sindicato']);
             if ($dup) {
                 $this->json(['success' => false, 'message' => $this->mensajeDuplicado($dup)]);
             }
@@ -115,9 +117,10 @@ class Rutas_controller {
         }
 
         $d = ValidarRutas::normalizar($_POST);
-        // Origen y destino son la identidad de la ruta: no se modifican
-        $d['id_origen']  = (int)$ruta['id_sucursal_origen'];
-        $d['id_destino'] = (int)$ruta['id_sucursal_destino'];
+        // Origen, destino y sindicato son la identidad de la ruta: no se modifican
+        $d['id_origen']    = (int)$ruta['id_sucursal_origen'];
+        $d['id_destino']   = (int)$ruta['id_sucursal_destino'];
+        $d['id_sindicato'] = (int)$ruta['id_sindicato'];
         $this->validarDatos($d);
 
         try {
@@ -131,7 +134,6 @@ class Rutas_controller {
         }
     }
 
-    /** Activar / desactivar (reversible). Una ruta inactiva deja de ofrecerse en turnos y encomiendas. */
     public function cambiarEstado() {
         $this->acceso(true);
         $this->soloPost();
@@ -145,7 +147,7 @@ class Rutas_controller {
         }
 
         try {
-            if ($estado === 0 && $this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'])) {
+            if ($estado === 0 && $this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato'])) {
                 $this->json(['success' => false, 'message' => 'No se puede desactivar: hay turnos abiertos en esta ruta. Despáchelos o cancélelos primero.']);
             }
             if (!$this->rutasModel->cambiarEstado($id, $ruta, $estado)) {
@@ -160,7 +162,6 @@ class Rutas_controller {
         }
     }
 
-    /** Borrado suave. */
     public function eliminar() {
         $this->acceso(true);
         $this->soloPost();
@@ -172,7 +173,7 @@ class Rutas_controller {
         }
 
         try {
-            if ($this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'])) {
+            if ($this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato'])) {
                 $this->json(['success' => false, 'message' => 'No se puede eliminar: hay turnos abiertos en esta ruta. Despáchelos o cancélelos primero.']);
             }
             if (!$this->rutasModel->eliminar($id, $ruta, date('Y-m-d H:i:s'))) {
@@ -212,19 +213,27 @@ class Rutas_controller {
 
     /* ============================ PRIVADOS ============================ */
 
-    private function idSindicato() {
-        return (int)($_SESSION['id_sindicato'] ?? 0);
-    }
+    private function idSindicato() { return (int)($_SESSION['id_sindicato'] ?? 1); }
+    private function idSucursal()  { return (int)($_SESSION['id_sucursal'] ?? 0); }
+    private function esPrincipal() { return (int)($_SESSION['es_principal'] ?? 0) === 1; }
 
     private function datosFormulario() {
+        $miSucursal = $this->idSucursal();
+        $origen = null;
+        foreach ($this->rutasModel->getOrigenes($this->idSindicato()) as $s) {
+            if ((int)$s['id_sucursal'] === $miSucursal) $origen = $s;
+        }
+
         return [
-            'origenes'   => $this->rutasModel->getOrigenes($this->idSindicato()),
-            'destinos'   => $this->rutasModel->getDestinos(),
+            'origen'     => $origen,
+            'sindicatos' => $this->rutasModel->getSindicatos($this->esPrincipal() ? 0 : $this->idSindicato()),
+            'destinos'   => array_values(array_filter($this->rutasModel->getDestinos(), function ($s) use ($miSucursal) {
+                return (int)$s['id_sucursal'] !== $miSucursal;
+            })),
             'contenidos' => $this->rutasModel->getContenidosActivos(),
         ];
     }
 
-    /** Formato + existencia de los tipos de contenido. Responde JSON si falla. */
     private function validarDatos(array $d) {
         $error = ValidarRutas::validar($d);
         if ($error !== null) {
@@ -236,7 +245,6 @@ class Rutas_controller {
         }
     }
 
-    /** Sesión iniciada. $json = true responde JSON (AJAX); false redirige (vistas). */
     private function acceso($json) {
         if (empty($_SESSION['id_usuario'])) {
             if ($json) {
@@ -254,13 +262,12 @@ class Rutas_controller {
     }
 
     private function mensajeDuplicado(array $dup) {
-        return 'Ya existe una ruta entre esas dos sucursales.' . ($dup['eliminado'] ? ' Está en la papelera: restáurela desde allí.' : '');
+        return 'Ya existe una ruta de ese sindicato entre esas dos sucursales.' . ($dup['eliminado'] ? ' Está en la papelera: restáurela desde allí.' : '');
     }
 
-    /** Nunca se expone el SQL al cliente. */
     private function errorBd(PDOException $e, $accion) {
         if ((int)($e->errorInfo[1] ?? 0) === 1062) {
-            $this->json(['success' => false, 'message' => 'Ya existe una ruta entre esas dos sucursales.']);
+            $this->json(['success' => false, 'message' => 'Ya existe una ruta de ese sindicato entre esas dos sucursales.']);
         }
         error_log('Rutas ' . $accion . ': ' . $e->getMessage());
         $this->json(['success' => false, 'message' => 'Error de base de datos. Intente nuevamente o revise el log de PHP.']);

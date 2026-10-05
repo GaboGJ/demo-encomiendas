@@ -19,6 +19,12 @@
           <h6 class="text-dark font-weight-bolder mt-2 mb-0" id="detRutNombre">-</h6>
           <span class="badge badge-sm bg-gradient-success border-radius-pill mt-1" id="detRutEstado">-</span>
         </div>
+                  <div class="col-12">
+            <div class="p-3 bg-gray-100 border-radius-md">
+              <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block">Sindicato</span>
+              <p class="text-xs font-weight-bold text-dark mb-0" id="detRutSindicato">-</p>
+            </div>
+          </div>
 
         <div class="row g-3 mb-3">
           <div class="col-6">
@@ -78,6 +84,7 @@ function verDetalleRuta(idRuta) {
       }
 
       const d = res.data;
+      setTxt('detRutSindicato', d.nombre_sindicato);
       const setTxt = (id, v) => { document.getElementById(id).textContent = (v !== null && v !== undefined && String(v).trim() !== '') ? v : '-'; };
       const fecha = f => f ? f.substring(0, 10).split('-').reverse().join('/') : '-';
       const esc = s => { const x = document.createElement('div'); x.textContent = s == null ? '' : String(s); return x.innerHTML; };

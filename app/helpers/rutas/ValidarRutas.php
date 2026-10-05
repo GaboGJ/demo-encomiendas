@@ -1,7 +1,7 @@
 <?php
 /**
  * helpers/rutas/ValidarRutas.php
- * Normalización y validación del módulo Rutas (precio de pasaje + tarifas de encomienda).
+ * Normalización y validación del módulo Rutas (sindicato + precio de pasaje + tarifas de encomienda).
  * validar() devuelve null si todo es válido o el mensaje de error.
  */
 class ValidarRutas {
@@ -31,19 +31,23 @@ class ValidarRutas {
         }
 
         return [
-            'id_origen'  => intval($post['id_origen'] ?? 0),
-            'id_destino' => intval($post['id_destino'] ?? 0),
-            'precio'     => self::numero($post['precio_pasaje'] ?? ''),
-            'tarifas'    => $norm,
+            'id_origen'   => intval($post['id_origen'] ?? 0),
+            'id_destino'  => intval($post['id_destino'] ?? 0),
+            'id_sindicato'=> intval($post['id_sindicato'] ?? 0),
+            'precio'      => self::numero($post['precio_pasaje'] ?? ''),
+            'tarifas'     => $norm,
         ];
     }
 
     public static function validar(array $d) {
         if ($d['id_origen'] <= 0 || $d['id_destino'] <= 0) {
-            return 'Seleccione la sucursal de origen y la de destino.';
+            return 'Seleccione la sucursal de destino.';
         }
         if ($d['id_origen'] === $d['id_destino']) {
             return 'El origen y el destino no pueden ser la misma sucursal.';
+        }
+        if ($d['id_sindicato'] <= 0) {
+            return 'Seleccione el sindicato al que pertenece la ruta.';
         }
         if ($d['precio'] === null || $d['precio'] <= 0 || $d['precio'] > self::MAX_MONTO) {
             return 'Indique un precio de pasaje válido (mayor a 0).';

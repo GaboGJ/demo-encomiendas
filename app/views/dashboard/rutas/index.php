@@ -51,7 +51,7 @@
         <div class="card-header bg-white p-4 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3">
           <div>
             <h5 class="font-weight-bolder text-dark mb-0">Tabla Oficial de Rutas y Tarifarios Vigentes</h5>
-            <p class="text-xs text-secondary mb-0">Trayectos entre sucursales, precio del pasaje y tarifas de encomienda por tipo de contenido</p>
+            <p class="text-xs text-secondary mb-0">Trayectos entre sucursales por sindicato, precio del pasaje y tarifas de encomienda por tipo de contenido</p>
           </div>
           <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto">
             <a href="<?= rtrim(URL, '/') ?>/rutas/papelera" class="btn btn-outline-secondary mb-0 border-radius-md px-3 d-inline-flex align-items-center justify-content-center gap-2">
@@ -73,8 +73,9 @@
               <thead>
                 <tr>
                   <th data-priority="1" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 ps-4 ps-md-5 pe-4 border-top border-bottom border-light">Origen / Destino</th>
-                  <th data-priority="3" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Tarifa Pasaje (Bs.)</th>
-                  <th data-priority="4" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Tarifas Encomienda (Bs.)</th>
+                  <th data-priority="3" class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Sindicato</th>
+                  <th data-priority="4" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Tarifa Pasaje (Bs.)</th>
+                  <th data-priority="5" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Tarifas Encomienda (Bs.)</th>
                   <th data-priority="2" class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 px-3 border-top border-bottom border-light">Estado</th>
                   <th data-priority="1" class="text-end text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 py-3 pe-4 pe-md-5 ps-4 border-top border-bottom border-light">Acciones</th>
                 </tr>
@@ -85,7 +86,7 @@
                     $activo   = (int)$r['estado_ruta'] === 1;
                     $gradient = $gradientes[$r['id_precio_pasaje'] % count($gradientes)];
                     $nTar     = (int)$r['total_tarifas'];
-                    $nombreJs = $h(addslashes($r['ciudad_origen'] . ' ➔ ' . $r['ciudad_destino']));
+                    $nombreJs = $h(addslashes($r['ciudad_origen'] . ' ➔ ' . $r['ciudad_destino'] . ' (' . $r['nombre_sindicato'] . ')'));
                   ?>
                   <tr>
                     <td class="py-3 ps-4 ps-md-5 pe-4">
@@ -98,6 +99,10 @@
                           <span class="text-xxs text-secondary font-weight-bold"><?= $h($r['nombre_origen']) ?> · <?= $h($r['nombre_destino']) ?></span>
                         </div>
                       </div>
+                    </td>
+                    <td class="py-3 px-3 align-middle">
+                      <span class="text-xs font-weight-bold text-dark"><?= $h($r['nombre_sindicato']) ?></span>
+                      <?php if ($r['sigla_sindicato']): ?><span class="d-block text-xxs text-secondary font-weight-bold"><?= $h($r['sigla_sindicato']) ?></span><?php endif; ?>
                     </td>
                     <td class="align-middle text-center py-3 px-3">
                       <span class="text-sm font-weight-bolder text-dark">Bs. <?= number_format($r['base_precio_pasaje'], 2) ?></span>
@@ -150,7 +155,6 @@
             </table>
           </div>
         </div>
-
       </div>
     </div>
   </div>
@@ -169,7 +173,6 @@
   function procesar(url, datos, titError) {
     enviar(url, datos)
       .then(function (res) {
-        // El mensaje de éxito ya quedó encolado en Flash (servidor) y sale al recargar
         if (res.success) window.location.reload();
         else Swal.fire(titError, res.message || 'Ocurrió un error.', 'error');
       })
