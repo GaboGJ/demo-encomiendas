@@ -353,17 +353,42 @@ class Encomiendas_model {
         }
     }
 
-    /** Anula una guía propia que aún no tiene turno ni entrega (borrado suave). */
+  /** Anula una guía propia que aún no tiene turno ni entrega (borrado suave). */
     public function anularEncomienda($id, $id_sucursal) {
-        $st = $this->pdo->prepare("UPDATE encomiendas e SET e.estado_encomienda = 0, e.delete_encomienda = NOW(), e.update_encomienda = NOW()
-            WHERE e.id_encomienda = :id AND e.id_sucursal_origen = :o AND e.id_turno IS NULL
-            AND (e.estado_encomienda = 1 OR e.estado_encomienda IS NULL)
-            AND NOT EXISTS (SELECT 1 FROM entregas_encomiendas en WHERE en.id_encomienda = e.id_encomienda)");
-        $st->execute([':id' => $id, ':o' => $id_sucursal]);
-        if ($st->rowCount() === 0) return false;
-        $this->pdo->prepare("UPDATE detalles_encomiendas SET estado_detalle_encomienda = 0, delete_detalle_encomienda = NOW() WHERE id_encomienda = :id")
-            ->execute([':id' => $id]);
-        return true;
+        $this->pdo->beginTransaction();
+        try {
+            $st = $this->pdo->prepare(
+                "UPDATE encomiendas
+                SET estado_encomienda = 0, delete_encomienda = NOW(), update_encomienda = NOW()
+                WHERE id_encomienda = :id
+                AND id_sucursal_origen = :o
+                AND id_turno IS NULL
+                AND (estado_encomienda = 1 OR estado_encomienda IS NULL)
+                AND NOT EXISTS (
+                    SELECT 1 FROM entregas_encomiendas en
+                    WHERE en.id_encomienda = :id2 AND en.delete_entrega_encomienda IS NULL
+                )"
+            );
+            $st->execute([':id' => $id, ':id2' => $id, ':o' => $id_sucursal]);
+
+            if ($st->rowCount() === 0) {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $this->pdo->prepare(
+                "UPDATE detalles_encomiendas
+                SET estado_detalle_encomienda = 0, delete_detalle_encomienda = NOW(), update_detalle_encomienda = NOW()
+                WHERE id_encomienda = :id"
+            )->execute([':id' => $id]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            error_log('anularEncomienda: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     /** Datos públicos (sin datos personales ni montos) para el rastreo. */

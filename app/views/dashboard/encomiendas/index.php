@@ -122,11 +122,13 @@
                                                                     title="Imprimir Guía">
                                                                 <i class="material-symbols-rounded text-sm">print</i>
                                                             </button>                                                       
-                                                            <?php if (!in_array($estado, ['asignado', 'enviado', 'entregado'])): ?>
-<button type="button" class="btn btn-link text-danger p-2 mb-0" title="Anular Guía"
-        onclick="anularGuia(<?= (int)$envio['id_encomienda'] ?>, '<?= htmlspecialchars($envio['guia_encomienda'], ENT_QUOTES) ?>')">
-  <i class="material-symbols-rounded text-sm">delete</i>
-</button>
+                                                <?php if (empty($envio['id_turno']) && !in_array($estado, ['asignado', 'enviado', 'entregado'])): ?>
+    <button type="button" 
+            class="btn btn-link text-danger p-2 mb-0" 
+            title="Anular Guía"
+            onclick="anularGuia(<?= (int)$envio['id_encomienda'] ?>, '<?= htmlspecialchars($envio['guia_encomienda'], ENT_QUOTES, 'UTF-8') ?>')">
+        <i class="material-symbols-rounded text-sm">delete</i>
+    </button>
 <?php endif; ?>
                                                         </div>
                                                     </td>
@@ -256,38 +258,61 @@
 </div>
 
 <script>
-    $(document).ready(function() {
-        // Inicializar la tabla de envíos
-        if (typeof inicializarDataTable === 'function') {
-            inicializarDataTable('#datatable-encomiendas', { ordering: false, placeholder: 'Buscar envío...' });
+// 1. Declarar la función fuera de document.ready para que sea GLOBAL
+window.anularGuia = function (id, guia) {
+    Swal.fire({
+        title: '¿Anular la guía #' + guia + '?',
+        text: 'Dejará de contar en caja y reportes. No se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, anular',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f5365c'
+    }).then(function (r) {
+        if (!r.isConfirmed) return;
+
+        const fd = new FormData();
+        fd.append('id_encomienda', id);
+
+        fetch('<?= URL ?>/encomiendas/anular', {
+            method: 'POST',
+            body: fd
+        })
+        .then(x => x.json())
+        .then(res => {
+            if (res.success) {
+                location.reload();
+            } else {
+                Swal.fire('No se pudo anular', res.message || 'Error al procesar la solicitud', 'error');
+            }
+        })
+        .catch(() => Swal.fire('Error', 'Error en el servidor', 'error'));
+    });
+};
+
+// 2. Inicializar DataTables y eventos al cargar el DOM
+$(document).ready(function() {
+    // Inicializar la tabla de envíos
+    if (typeof inicializarDataTable === 'function') {
+        inicializarDataTable('#datatable-encomiendas', { ordering: false, placeholder: 'Buscar envío...' });
+    }
+
+    var llegadasInicializada = false;
+
+    // Escuchar el cambio de pestaña para inicializar lazy-loading del DataTable de llegadas
+    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var targetTab = $(e.target).attr('href');
+        
+        if (targetTab === '#tab-llegadas' && !llegadasInicializada) {
+            if (typeof inicializarDataTable === 'function') {
+                inicializarDataTable('#datatable-llegadas', { ordering: false, placeholder: 'Buscar llegada...' });
+            }
+            llegadasInicializada = true;
         }
 
-        window.anularGuia = function (id, guia) {
-  Swal.fire({title:'¿Anular la guía #' + guia + '?', text:'Dejará de contar en caja y reportes. No se puede deshacer.', icon:'warning',
-    showCancelButton:true, confirmButtonText:'Sí, anular', cancelButtonText:'Cancelar', confirmButtonColor:'#f5365c'})
-  .then(function (r) {
-    if (!r.isConfirmed) return;
-    const fd = new FormData(); fd.append('id_encomienda', id);
-    fetch('<?= rtrim(URL, "/") ?>/encomiendas/anular', {method:'POST', body:fd}).then(x => x.json())
-      .then(res => res.success ? location.reload() : Swal.fire('No se pudo anular', res.message, 'error'))
-      .catch(() => Swal.fire('Error', 'Error en el servidor', 'error'));
-  });
-};
-var llegadasInicializada = false;
-        // Escuchar el cambio de pestaña para inicializar lazy-loading del DataTable de llegadas
-        $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-            var targetTab = $(e.target).attr('href');
-            
-            if (targetTab === '#tab-llegadas' && !llegadasInicializada) {
-                if (typeof inicializarDataTable === 'function') {
-                    inicializarDataTable('#datatable-llegadas', { ordering: false, placeholder: 'Buscar llegada...' });
-                }
-                llegadasInicializada = true;
-            }
-
-            if ($.fn.DataTable) {
-                $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
-            }
-        });
+        if ($.fn.DataTable) {
+            $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+        }
     });
+});
 </script>
