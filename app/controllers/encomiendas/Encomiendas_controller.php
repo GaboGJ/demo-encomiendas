@@ -4,9 +4,10 @@ require_once __DIR__ . '/../../models/personas/Personas_model.php';
 require_once __DIR__ . '/../../models/sucursales/Sucursales_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
 require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
-// Flash ya está disponible globalmente: se incluye una sola vez desde config/config.php
 
 class Encomiendas_controller {
+    const MAX_MONTO = 99999999.99;
+
     private $encomiendasModel;
     private $personasModel;
     private $sucursalesModel;
@@ -14,11 +15,15 @@ class Encomiendas_controller {
     private $cajasModel;
 
     public function __construct() {
-        $this->encomiendasModel = new Encomiendas_model();
-        $this->personasModel    = new Personas_model();
-        $this->sucursalesModel  = new Sucursales_model();
+        $this->encomiendasModel  = new Encomiendas_model();
+        $this->personasModel     = new Personas_model();
+        $this->sucursalesModel   = new Sucursales_model();
         $this->metodosPagosModel = new Metodos_pagos_model();
-        $this->cajasModel = new Cajas_model();
+        $this->cajasModel        = new Cajas_model();
+    }
+
+    private function idSindicato() {
+        return (int)($_SESSION['id_sindicato'] ?? 0);
     }
 
     public function index() {
@@ -73,19 +78,11 @@ class Encomiendas_controller {
             exit;
         }
 
-        $contenidos = $this->encomiendasModel->getContenidosPorRuta($id_origen, $id_destino);
+        $contenidos = $this->encomiendasModel->getContenidosPorRuta($id_origen, $id_destino, $this->idSindicato());
         echo json_encode(['success' => true, 'data' => $contenidos]);
         exit;
     }
 
-    /**
-     * Lista el catálogo de tipos de contenido para clasificar los bultos que llegan
-     * en la RECEPCIÓN. A diferencia de "obtenerContenidosPorDestino" (que usa "new"),
-     * aquí NO se filtra por ruta/tarifa: la carga llega desde una sucursal externa
-     * que no maneja este sistema, así que nunca existirá una fila en
-     * tarifas_encomiendas para esa ruta. Solo se necesita el nombre del tipo de
-     * contenido para describir el bulto, no un precio.
-     */
     public function obtenerContenidosPorOrigen() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
@@ -108,13 +105,14 @@ class Encomiendas_controller {
         $id_origen    = $_SESSION['id_sucursal'] ?? 1;
         $id_destino   = intval($_GET['id_destino'] ?? 0);
         $id_contenido = intval($_GET['id_contenido'] ?? 0);
+        $peso         = floatval($_GET['peso'] ?? 0);
 
         if (!$id_destino || !$id_contenido) {
             echo json_encode(['success' => false, 'message' => 'Parámetros insuficientes']);
             exit;
         }
 
-        $precio = $this->encomiendasModel->obtenerTarifa($id_origen, $id_destino, $id_contenido);
+        $precio = $this->encomiendasModel->obtenerTarifa($id_origen, $id_destino, $id_contenido, $peso, $this->idSindicato());
 
         if ($precio !== null) {
             echo json_encode(['success' => true, 'precio' => $precio]);
@@ -124,9 +122,53 @@ class Encomiendas_controller {
         exit;
     }
 
+    /** Busca la persona por C.I. o la registra (nombres y apellido paterno obligatorios si es nueva). */
+    private function resolverPersona($prefijo, $etiqueta) {
+        $ci = trim($_POST[$prefijo . '_ci'] ?? '');
+        if ($ci === '') {
+            throw new InvalidArgumentException("El C.I. del {$etiqueta} es obligatorio");
+        }
+
+        $persona = $this->personasModel->buscarPorCi($ci);
+        if ($persona) {
+            return $persona['id_persona'];
+        }
+
+        $nombres = trim($_POST[$prefijo . '_nombres'] ?? '');
+        $paterno = trim($_POST[$prefijo . '_paterno'] ?? '');
+        if ($nombres === '' || $paterno === '') {
+            throw new InvalidArgumentException("Nombres y apellido paterno del {$etiqueta} son obligatorios");
+        }
+
+        return $this->personasModel->insertarPersona(
+            $ci,
+            $nombres,
+            $paterno,
+            trim($_POST[$prefijo . '_materno'] ?? ''),
+            trim($_POST[$prefijo . '_celular'] ?? ''),
+            trim($_POST[$prefijo . '_direccion'] ?? '')
+        );
+    }
+
+    /** Número >= 0 con 2 decimales, o null si es inválido. */
+    private function montoValido($v) {
+        $v = str_replace(',', '.', trim((string)$v));
+        if ($v === '') return 0.0;
+        if (!is_numeric($v)) return null;
+        $n = round((float)$v, 2);
+        return ($n >= 0 && $n <= self::MAX_MONTO) ? $n : null;
+    }
+
+    /**
+     * Emite la guía. Los precios se calculan en el SERVIDOR: el subtotal de cada
+     * bulto sale de tarifas_encomiendas y el total es subtotal + seguro - descuento.
+     * Lo que envía el navegador (monto_total, subtotal) se ignora.
+     */
     public function guardar() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
+
+        global $pdo;
 
         try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -134,120 +176,143 @@ class Encomiendas_controller {
                 exit;
             }
 
-            $id_sucursal_origen = $_SESSION['id_sucursal'] ?? 1;
-            $id_usuario         = $_SESSION['id_usuario'] ?? 1;
-                        
+            $id_sucursal_origen = (int)($_SESSION['id_sucursal'] ?? 0);
+            $id_usuario         = (int)($_SESSION['id_usuario'] ?? 0);
+            $id_sindicato       = $this->idSindicato();
+
             $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario);
             if ($id_historial_caja <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Debe aperturar una caja antes de emitir guías (módulo Control de Cajas).']);
-                exit;
+                throw new InvalidArgumentException('Debe aperturar una caja antes de emitir guías (módulo Control de Cajas).');
             }
 
-            $ciRemitente = trim($_POST['remitente_ci'] ?? '');
-            if (empty($ciRemitente)) {
-                echo json_encode(['success' => false, 'message' => 'El C.I. del remitente es obligatorio']);
-                exit;
+            // Destino válido (activo y distinto del origen)
+            $id_destino = intval($_POST['id_sucursal_destino'] ?? 0);
+            $validos = array_map('intval', array_column($this->sucursalesModel->getSucursalesDestino($id_sucursal_origen), 'id_sucursal'));
+            if ($id_destino <= 0 || $id_destino === $id_sucursal_origen || !in_array($id_destino, $validos, true)) {
+                throw new InvalidArgumentException('La agencia de destino no es válida.');
             }
 
-            $personaRemitente = $this->personasModel->buscarPorCi($ciRemitente);
-            if ($personaRemitente) {
-                $id_remitente = $personaRemitente['id_persona'];
-            } else {
-                $id_remitente = $this->personasModel->insertarPersona(
-                    $ciRemitente,
-                    trim($_POST['remitente_nombres'] ?? ''),
-                    trim($_POST['remitente_paterno'] ?? ''),
-                    trim($_POST['remitente_materno'] ?? ''),
-                    trim($_POST['remitente_celular'] ?? ''),
-                    trim($_POST['remitente_direccion'] ?? '')
-                );
+            $declaracion = trim($_POST['contenido'] ?? '');
+            if ($declaracion === '') {
+                throw new InvalidArgumentException('Indique la declaración del contenido.');
             }
 
-            $ciDestinatario = trim($_POST['destinatario_ci'] ?? '');
-            if (empty($ciDestinatario)) {
-                echo json_encode(['success' => false, 'message' => 'El C.I. del destinatario es obligatorio']);
-                exit;
+            // Modalidad y método de cobro
+            $estadoPago = (($_POST['modalidad_pago'] ?? '1') === '0') ? 0 : 1;
+            $idMetodo   = intval($_POST['metodo_cobro'] ?? 0);
+            $metodosOk  = array_map('intval', array_column($this->metodosPagosModel->getMetodosPagosActivos(), 'id_metodo_pago'));
+            if (!in_array($idMetodo, $metodosOk, true)) {
+                throw new InvalidArgumentException('El método de cobro no es válido.');
             }
 
-            $personaDestinatario = $this->personasModel->buscarPorCi($ciDestinatario);
-            if ($personaDestinatario) {
-                $id_destinatario = $personaDestinatario['id_persona'];
-            } else {
-                $id_destinatario = $this->personasModel->insertarPersona(
-                    $ciDestinatario,
-                    trim($_POST['destinatario_nombres'] ?? ''),
-                    trim($_POST['destinatario_paterno'] ?? ''),
-                    trim($_POST['destinatario_materno'] ?? ''),
-                    trim($_POST['destinatario_celular'] ?? ''),
-                    trim($_POST['destinatario_direccion'] ?? '')
-                );
+            // Bultos: el subtotal sale de la tarifa en base de datos
+            $bultos = json_decode($_POST['bultos_json'] ?? '[]', true);
+            if (empty($bultos) || !is_array($bultos)) {
+                throw new InvalidArgumentException('Debe registrar al menos un bulto.');
             }
 
-            $dataEncomienda = [
-                'id_sucursal_origen'     => $id_sucursal_origen,
-                'id_sucursal_destino'    => $_POST['id_sucursal_destino'] ?? null,
-                'id_persona_remitente'   => $id_remitente,
-                'id_persona_destinatario'=> $id_destinatario,
-                'id_turno'               => !empty($_POST['id_turno']) ? $_POST['id_turno'] : null,
-                'declaracion_encomienda' => trim($_POST['contenido'] ?? ''),
-                'monto_encomienda'       => floatval($_POST['monto_total'] ?? 0),
-                'estado_pago_encomienda' => isset($_POST['modalidad_pago']) ? intval($_POST['modalidad_pago']) : 1,
-                'id_metodo_pago'         => intval($_POST['metodo_cobro'] ?? 1),
-                'id_historial_caja'      => $id_historial_caja,
-                'id_usuario'             => $id_usuario
-            ];
+            $subtotal = 0.0;
+            foreach ($bultos as $i => &$b) {
+                $n = $i + 1;
+                $b['descripcion']  = trim((string)($b['descripcion'] ?? ''));
+                $b['id_contenido'] = intval($b['id_contenido'] ?? 0);
+                $peso = floatval($b['peso'] ?? 0);
+                if ($b['descripcion'] === '' || mb_strlen($b['descripcion'], 'UTF-8') > 50) {
+                    throw new InvalidArgumentException("Bulto #{$n}: la descripción es obligatoria (máximo 50 caracteres).");
+                }
+                if ($b['id_contenido'] <= 0) {
+                    throw new InvalidArgumentException("Bulto #{$n}: seleccione el tipo de contenido.");
+                }
+                if ($peso < 0 || $peso > self::MAX_MONTO) {
+                    throw new InvalidArgumentException("Bulto #{$n}: el peso no es válido.");
+                }
+                $b['peso'] = $peso;
 
-            $resEncomienda = $this->encomiendasModel->insertarEncomienda($dataEncomienda);
-            $idEncomienda  = $resEncomienda['id_encomienda'];
+                $precio = $this->encomiendasModel->obtenerTarifa($id_sucursal_origen, $id_destino, $b['id_contenido'], $peso, $id_sindicato);
+                if ($precio === null) {
+                    throw new InvalidArgumentException("Bulto #{$n}: no existe una tarifa para esa ruta, contenido" . ($peso > 0 ? ' y peso.' : '.'));
+                }
+                $b['subtotal'] = round($precio, 2);
+                $subtotal += $b['subtotal'];
+            }
+            unset($b);
+            $subtotal = round($subtotal, 2);
+
+            // Seguro y descuento: validados y acotados
+            $seguro    = $this->montoValido($_POST['monto_seguro'] ?? '');
+            $descuento = $this->montoValido($_POST['monto_descuento'] ?? '');
+            if ($seguro === null || $descuento === null) {
+                throw new InvalidArgumentException('El seguro y el descuento deben ser números mayores o iguales a 0.');
+            }
+            if ($descuento > $subtotal) {
+                throw new InvalidArgumentException('El descuento no puede ser mayor al subtotal de los bultos (Bs. ' . number_format($subtotal, 2) . ').');
+            }
+            $montoTotal = round($subtotal + $seguro - $descuento, 2);
+
+            $pdo->beginTransaction();
+
+            $id_remitente    = $this->resolverPersona('remitente', 'remitente');
+            $id_destinatario = $this->resolverPersona('destinatario', 'destinatario');
+
+            $resEncomienda = $this->encomiendasModel->insertarEncomienda([
+                'id_sucursal_origen'      => $id_sucursal_origen,
+                'id_sucursal_destino'     => $id_destino,
+                'id_persona_remitente'    => $id_remitente,
+                'id_persona_destinatario' => $id_destinatario,
+                'id_turno'                => null,
+                'declaracion_encomienda'  => $declaracion,
+                'monto_encomienda'        => $montoTotal,
+                'estado_pago_encomienda'  => $estadoPago,
+                'id_metodo_pago'          => $idMetodo,
+                'id_historial_caja'       => $id_historial_caja,
+                'id_usuario'              => $id_usuario
+            ]);
+            $idEncomienda   = $resEncomienda['id_encomienda'];
             $guiaEncomienda = $resEncomienda['guia'];
 
-            $bultos = json_decode($_POST['bultos_json'] ?? '[]', true);
-            if (!empty($bultos) && is_array($bultos)) {
-                foreach ($bultos as $index => $bulto) {
-                    $numeroBulto = $index + 1;
-                    $this->encomiendasModel->insertarDetalleEncomienda($idEncomienda, $guiaEncomienda, $numeroBulto, $bulto);
-                }
+            foreach ($bultos as $index => $bulto) {
+                $this->encomiendasModel->insertarDetalleEncomienda($idEncomienda, $guiaEncomienda, $index + 1, $bulto);
             }
 
-            // Mensaje que se mostrará automáticamente en la PRÓXIMA vista que cargue
-            // (el listado, a donde el JS redirige después de imprimir la guía).
-            Flash::set(
-                true,
-                "La guía #{$guiaEncomienda} fue generada y registrada correctamente.",
-                'Guía Emitida'
-            );
+            $pdo->commit();
+
+            Flash::set(true, "La guía #{$guiaEncomienda} fue generada y registrada correctamente.", 'Guía Emitida');
 
             echo json_encode([
-                'success'       => true, 
-                'guia'          => $guiaEncomienda, 
-                'id_encomienda' => $idEncomienda
+                'success'       => true,
+                'guia'          => $guiaEncomienda,
+                'id_encomienda' => $idEncomienda,
+                'monto_total'   => $montoTotal
             ]);
             exit;
 
+        } catch (InvalidArgumentException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error en el servidor: ' . $e->getMessage()]);
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            error_log('Encomiendas guardar: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Error en el servidor al guardar la encomienda.']);
             exit;
         }
     }
 
     public function imprimir() {
-        // Tomar el ID directamente del parámetro query (?id=X)
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
         if ($id <= 0) {
             die("Error: Identificador de encomienda no válido.");
         }
 
-        // Obtener los datos desde el modelo
         $encomienda = $this->encomiendasModel->obtenerEncomiendaCompleta($id);
 
         if (!$encomienda) {
             die("Error: La encomienda solicitada no existe.{$id}");
         }
 
-        // Cargar únicamente la plantilla de la impresión
         require_once __DIR__ . '/../../views/dashboard/encomiendas/print.php';
-        exit; // Detener ejecución para no cargar layouts o dashboards extra
+        exit;
     }
 
     public function detalle() {
@@ -276,9 +341,8 @@ class Encomiendas_controller {
         $viewPath = __DIR__ . '/../../views/dashboard/';
         $menuActivo = 'encomiendas';
 
-        $id_sucursal_actual = $_SESSION['id_sucursal'] ?? 1; // Sucursal Destino (Local)
+        $id_sucursal_actual = $_SESSION['id_sucursal'] ?? 1;
         
-        // Obtener sucursales excepto la actual para elegirlas como Origen
         $sucursales_origen = $this->sucursalesModel->getSucursalesDestino($id_sucursal_actual); 
         $metodos_pago      = $this->metodosPagosModel->getMetodosPagosActivos();
 
@@ -304,7 +368,7 @@ class Encomiendas_controller {
                 exit;
             }
 
-            $id_sucursal_destino = $_SESSION['id_sucursal'] ?? 1; // Destino es la sucursal actual
+            $id_sucursal_destino = $_SESSION['id_sucursal'] ?? 1;
             $id_usuario          = $_SESSION['id_usuario'] ?? 1;
             $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario) ?: null;
 
@@ -314,7 +378,6 @@ class Encomiendas_controller {
                 exit;
             }
 
-            // Remitente (Origen)
             $ciRemitente = trim($_POST['remitente_ci'] ?? '');
             if (empty($ciRemitente)) {
                 echo json_encode(['success' => false, 'message' => 'El C.I. del remitente es obligatorio']);
@@ -335,7 +398,6 @@ class Encomiendas_controller {
                 );
             }
 
-            // Destinatario (Local)
             $ciDestinatario = trim($_POST['destinatario_ci'] ?? '');
             if (empty($ciDestinatario)) {
                 echo json_encode(['success' => false, 'message' => 'El C.I. del destinatario es obligatorio']);
@@ -356,8 +418,7 @@ class Encomiendas_controller {
                 );
             }
 
-            // Evaluación del cobro y estado de pago
-            $estadoPago = isset($_POST['estado_pago_encomienda']) ? intval($_POST['estado_pago_encomienda']) : 1; // 1 = Pagado, 0 = Pendiente/COD
+            $estadoPago = isset($_POST['estado_pago_encomienda']) ? intval($_POST['estado_pago_encomienda']) : 1;
             $idMetodoPago = intval($_POST['id_metodo_pago'] ?? 1);
 
             $dataEncomienda = [
@@ -375,12 +436,6 @@ class Encomiendas_controller {
                 'id_historial_caja'      => $id_historial_caja
             ];
 
-            // La recepción no maneja tarifa (la sucursal externa no usa este sistema,
-            // así que no existe un precio local para esa ruta). Solo se exige el tipo
-            // de contenido para clasificar el bulto; detalles_encomiendas.id_encomienda_contenido
-            // es NOT NULL en la BD, así que se valida antes de tocarla. El subtotal por
-            // bulto no aplica aquí (se fuerza a 0 más abajo): el monto a cobrar real
-            // ya se registra a nivel de la encomienda (monto_encomienda).
             $bultos = json_decode($_POST['bultos_json'] ?? '[]', true);
             if (empty($bultos) || !is_array($bultos)) {
                 echo json_encode(['success' => false, 'message' => 'Debe registrar al menos un bulto']);
@@ -402,7 +457,7 @@ class Encomiendas_controller {
 
                 foreach ($bultos as $index => $bulto) {
                     $numeroBulto = $index + 1;
-                    $bulto['subtotal'] = 0; // No aplica tarifa local en recepción; se fuerza en servidor.
+                    $bulto['subtotal'] = 0;
                     $this->encomiendasModel->insertarDetalleEncomienda($idEncomienda, $guiaManual, $numeroBulto, $bulto);
                 }
 
@@ -438,14 +493,14 @@ class Encomiendas_controller {
         $id_encomienda = intval($_GET['id'] ?? 0);
         if ($id_encomienda <= 0) {
             Flash::set(false, 'Identificador de encomienda inválido.', 'Error');
-            header('Location: ' . BASE_URL . 'encomiendas');
+            header('Location: ' . rtrim(URL, '/') . '/encomiendas');
             exit;
         }
 
         $encomienda = $this->encomiendasModel->obtenerEncomiendaCompleta($id_encomienda);
         if (!$encomienda) {
             Flash::set(false, 'La encomienda no fue encontrada.', 'Error');
-            header('Location: ' . BASE_URL . 'encomiendas');
+            header('Location: ' . rtrim(URL, '/') . '/encomiendas');
             exit;
         }
 
@@ -490,14 +545,10 @@ class Encomiendas_controller {
                 exit;
             }
 
-            // Buscar o registrar a la persona que retira la encomienda
             $personaReceptor = $this->personasModel->buscarPorCi($ciReceptor);
             if ($personaReceptor) {
                 $id_persona_retiro = $personaReceptor['id_persona'];
             } else {
-                // Persona nueva (alguien distinto al destinatario original retira la
-                // encomienda): apellido_paterno_persona es NOT NULL en el modelo de BD,
-                // así que se exige aquí para no insertar personas con datos incompletos.
                 $receptorPaterno = trim($_POST['receptor_paterno'] ?? '');
                 if (empty($receptorPaterno)) {
                     echo json_encode(['success' => false, 'message' => 'Debe indicar el apellido paterno de quien retira (persona no registrada previamente).']);
@@ -528,14 +579,8 @@ class Encomiendas_controller {
             $pdo->beginTransaction();
 
             try {
-                // 1. Insertar registro en entregas_encomiendas
                 $this->encomiendasModel->registrarEntrega($dataEntrega);
-
-                // 2. Actualizar estado operativo a "Entregado" y liquidar el pago: al
-                // completarse la entrega el saldo siempre queda cobrado (ya sea porque
-                // se pagó en origen, o porque se acaba de cobrar el COD en destino).
                 $this->encomiendasModel->marcarComoEntregada($id_encomienda);
-
                 $pdo->commit();
             } catch (Exception $e) {
                 $pdo->rollBack();
@@ -552,12 +597,6 @@ class Encomiendas_controller {
         }
     }
 
-    /**
-     * Acta de entrega imprimible. delivery.php ya llamaba a
-     * "encomiendas/imprimirActa?id=..." tras guardar la entrega, pero este método
-     * no existía en el controlador (por eso la ventana de impresión no abría nada
-     * válido). Sigue el mismo patrón que imprimir() para la guía de salida.
-     */
     public function imprimirActa() {
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 

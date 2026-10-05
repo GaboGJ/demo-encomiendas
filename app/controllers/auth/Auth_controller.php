@@ -7,6 +7,11 @@ require_once __DIR__ . '/../../helpers/auth/ValidarLogin.php';
 
 class Auth_controller {
 
+    // Hash bcrypt válido y descartable: se verifica cuando el C.I. no existe,
+    // para que el tiempo de respuesta no delate qué carnets están registrados.
+    const HASH_FALSO = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+    const MSG_CREDENCIALES = 'C.I. o contraseña incorrectos.';
+
     private $authModel;
 
     public function __construct() {
@@ -19,7 +24,6 @@ class Auth_controller {
     /* ============================ VISTA ============================ */
 
     public function index() {
-        // Si ya hay sesión, no mostrar el login
         if (!empty($_SESSION['id_usuario'])) {
             header('Location: ' . rtrim(URL, '/') . '/dashboard');
             exit;
@@ -50,17 +54,16 @@ class Auth_controller {
         try {
             $u = $this->authModel->obtenerUsuarioPorCarnet($ci);
 
-// 1. Verificar si el C.I. existe
-if (!$u) {
-    $this->json(['success' => false, 'message' => 'C.I. o contraseña incorrectos.']);
-}
+            // Un solo mensaje para "C.I. inexistente" y "contraseña incorrecta"
+            if (!$u) {
+                password_verify($password, self::HASH_FALSO);
+                $this->json(['success' => false, 'message' => self::MSG_CREDENCIALES]);
+            }
+            if (!password_verify($password, $u['password_usuario'])) {
+                $this->json(['success' => false, 'message' => self::MSG_CREDENCIALES]);
+            }
 
-// 2. Verificar contraseña
-$ok = password_verify($password, $u['password_usuario']);
-if (!$ok) {
-    $this->json(['success' => false, 'message' => 'Contraseña incorrecta.']);
-}
-
+            // Solo con credenciales correctas se informa el estado de la cuenta
             if ((int)$u['estado_usuario'] !== 1) {
                 $this->json(['success' => false, 'message' => 'Su cuenta está inactiva. Contacte al administrador.']);
             }
@@ -78,7 +81,6 @@ if (!$ok) {
                 $this->authModel->actualizarHash($u['id_usuario'], $password);
             }
 
-            // Evita fijación de sesión
             session_regenerate_id(true);
 
             $_SESSION['id_usuario']      = (int)$u['id_usuario'];
@@ -92,13 +94,12 @@ if (!$ok) {
             $_SESSION['nombre_sindicato']= $u['nombre_sindicato'];
             $_SESSION['ciudad']          = $u['ciudad_sucursal'];
 
-            // Mensaje de bienvenida (se muestra con SweetAlert en el dashboard)
-Flash::set(
-    true,
-    'Has ingresado como ' . $u['nombre_rol'] . ' en ' . $u['nombre_sindicato'] . '.',
-    '¡Bienvenido, ' . $_SESSION['nombre_usuario'] . '!',
-    'success'
-);
+            Flash::set(
+                true,
+                'Has ingresado como ' . $u['nombre_rol'] . ' en ' . $u['nombre_sindicato'] . '.',
+                '¡Bienvenido, ' . $_SESSION['nombre_usuario'] . '!',
+                'success'
+            );
 
             $this->json([
                 'success'  => true,
@@ -113,28 +114,21 @@ Flash::set(
 
     /* ============================ REGISTRO SINDICATO ============================ */
 
-    /**
-     * Crea en una sola transacción: persona (representante) -> sindicato (principal)
-     * -> sucursal "Casa Matriz" -> usuario administrador.
-     */
     public function registrarSindicato() {
         $this->soloPost();
 
-        // Paso 1: institución
         $nombreSind = $this->post('nombre_sindicato');
         $nit        = $this->post('nit');
         $telSind    = $this->post('telefono_sindicato');
         $ciudad     = $this->post('ciudad');
         $direccion  = $this->post('direccion');
 
-        // Paso 2: representante legal (será el administrador)
         $ci       = ValidarPersona::normalizarCi($this->post('rep_ci'));
         $nombres  = $this->post('rep_nombres');
         $paterno  = $this->post('rep_paterno');
         $materno  = $this->post('rep_materno');
         $celular  = $this->post('rep_celular');
 
-        // Paso 3: acceso
         $password  = (string)($_POST['password'] ?? '');
         $password2 = (string)($_POST['password_confirm'] ?? '');
 
@@ -155,7 +149,6 @@ Flash::set(
                 throw new Exception('Ya existe un sindicato registrado con ese NIT.');
             }
 
-            // Representante legal = administrador del sindicato
             $persona = $this->authModel->buscarPersonaPorCi($ci);
             if ($persona) {
                 $idPersona = (int)$persona['id_persona'];
@@ -167,7 +160,6 @@ Flash::set(
                 $idPersona = $this->authModel->insertarPersona($ci, $nombres, $paterno, $materno, $celular);
             }
 
-            // El modelo lo inserta con es_principal_sindicato = 1
             $idSindicato = $this->authModel->insertarSindicato([
                 'nombre'    => $nombreSind,
                 'sigla'     => '',
@@ -176,10 +168,8 @@ Flash::set(
                 'direccion' => $direccion
             ]);
 
-            // usuarios.id_sucursal es NOT NULL: se crea la sucursal sede del sindicato
             $idSucursal = $this->authModel->insertarSucursal($idSindicato, 'Casa Matriz', $ciudad, $direccion);
 
-            // El usuario creado con el sindicato es administrador
             $idRol = $this->authModel->obtenerOCrearRol(Auth_model::ROL_ADMIN_SIN, 'Administrador');
             $this->authModel->crearUsuario($idPersona, $idSucursal, $idRol, $password);
 
@@ -189,7 +179,6 @@ Flash::set(
 
         } catch (PDOException $e) {
             $this->authModel->revertir();
-            // 1062 = clave duplicada (otra petición se adelantó a las verificaciones de arriba)
             if ((int)($e->errorInfo[1] ?? 0) === 1062) {
                 $this->json(['success' => false, 'message' => 'Ya existe un registro con esos datos (nombre del sindicato, NIT o C.I.).']);
             }

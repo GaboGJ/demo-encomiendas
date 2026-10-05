@@ -66,9 +66,10 @@ class Encomiendas_model {
     }
 
     /**
-     * Obtiene los contenidos/tarifas disponibles para una ruta específica (Origen -> Destino)
+     * Contenidos/tarifas de una ruta (Origen -> Destino). Si se indica
+     * $id_sindicato solo se consideran las tarifas de ese sindicato.
      */
-    public function getContenidosPorRuta($id_origen, $id_destino) {
+    public function getContenidosPorRuta($id_origen, $id_destino, $id_sindicato = 0) {
         try {
             $sql = "SELECT DISTINCT 
                         ec.id_encomienda_contenido, 
@@ -78,26 +79,23 @@ class Encomiendas_model {
                     INNER JOIN encomiendas_contenidos ec ON te.id_encomienda_contenido = ec.id_encomienda_contenido
                     WHERE te.id_sucursal_origen = :origen 
                       AND te.id_sucursal_destino = :destino
+                      AND te.delete_tarifa_encomienda IS NULL
                       AND (te.estado_tarifa_encomienda = 1 OR te.estado_tarifa_encomienda IS NULL)
                       AND (ec.estado_encomienda_contenido = 1 OR ec.estado_encomienda_contenido IS NULL)";
+            $params = [':origen' => $id_origen, ':destino' => $id_destino];
+            if ((int)$id_sindicato > 0) {
+                $sql .= " AND te.id_sindicato = :sind";
+                $params[':sind'] = (int)$id_sindicato;
+            }
             $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([
-                ':origen'  => $id_origen,
-                ':destino' => $id_destino
-            ]);
+            $stmt->execute($params);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             return [];
         }
     }
 
-    /**
-     * Catálogo completo de tipos de contenido, SIN filtrar por ruta ni tarifa.
-     * Se usa en la Recepción (reception.php): la carga llega desde una sucursal
-     * externa que no maneja este sistema, así que no existe (ni existirá) una
-     * fila en tarifas_encomiendas para esa ruta. Aquí solo se necesita clasificar
-     * qué tipo de contenido trae cada bulto, no calcular un precio.
-     */
+    /** Catálogo de tipos de contenido sin filtrar por ruta (usado en la Recepción). */
     public function getContenidosActivos() {
         try {
             $sql = "SELECT id_encomienda_contenido, nombre_encomienda_contenido
@@ -111,37 +109,49 @@ class Encomiendas_model {
         }
     }
 
-    public function obtenerTarifa($id_origen, $id_destino, $id_contenido, $peso = 0) {
+    /**
+     * Precio de un bulto según ruta, sindicato, tipo de contenido y peso.
+     * Con peso > 0 se exige que caiga en el rango [peso_minimo, peso_maximo];
+     * sin peso se toma el rango más pequeño. Devuelve null si no hay tarifa.
+     */
+    public function obtenerTarifa($id_origen, $id_destino, $id_contenido, $peso = 0, $id_sindicato = 0) {
         $sql = "SELECT precio_tarifa_encomienda 
                 FROM tarifas_encomiendas 
                 WHERE id_sucursal_origen = :origen 
                   AND id_sucursal_destino = :destino 
                   AND id_encomienda_contenido = :contenido 
-                  AND (estado_tarifa_encomienda = 1 OR estado_tarifa_encomienda IS NULL) 
-                LIMIT 1";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([
+                  AND delete_tarifa_encomienda IS NULL
+                  AND (estado_tarifa_encomienda = 1 OR estado_tarifa_encomienda IS NULL)";
+        $params = [
             ':origen'    => $id_origen,
             ':destino'   => $id_destino,
             ':contenido' => $id_contenido
-        ]);
-        
+        ];
+
+        if ((int)$id_sindicato > 0) {
+            $sql .= " AND id_sindicato = :sind";
+            $params[':sind'] = (int)$id_sindicato;
+        }
+        if ((float)$peso > 0) {
+            $sql .= " AND (peso_minimo IS NULL OR peso_minimo <= :p1) AND peso_maximo >= :p2";
+            $params[':p1'] = (float)$peso;
+            $params[':p2'] = (float)$peso;
+        }
+        $sql .= " ORDER BY peso_maximo ASC LIMIT 1";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
         return $res ? floatval($res['precio_tarifa_encomienda']) : null;
     }
 
-  /**
-     * Genera un código de guía correlativo secuencial (Ej: ENC-000001)
-     */
     private function generarGuiaCorrelativa() {
         $sql = "SELECT id_encomienda FROM encomiendas ORDER BY id_encomienda DESC LIMIT 1";
         $stmt = $this->pdo->query($sql);
         $ultimo = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $siguienteId = $ultimo ? (intval($ultimo['id_encomienda']) + 1) : 1;
-        
-        // Genera formato ENC-000001, ENC-000002, etc.
         return 'ENC-' . str_pad($siguienteId, 6, '0', STR_PAD_LEFT);
     }
 
@@ -160,10 +170,11 @@ class Encomiendas_model {
         $stmt->bindValue(':remitente', $data['id_persona_remitente']);
         $stmt->bindValue(':destinatario', $data['id_persona_destinatario']);
         $stmt->bindValue(':turno', $data['id_turno'] ?? null);
+        $stmt->bindValue(':historial', $data['id_historial_caja'] ?? null);
         $stmt->bindValue(':usuario', $data['id_usuario']);
         $stmt->bindValue(':declaracion', $data['declaracion_encomienda']);
         $stmt->bindValue(':monto', $data['monto_encomienda']);
-        $stmt->bindValue(':estado_pago', (int)$data['estado_pago_encomienda'], PDO::PARAM_INT); // Se fuerza explícitamente a entero
+        $stmt->bindValue(':estado_pago', (int)$data['estado_pago_encomienda'], PDO::PARAM_INT);
         $stmt->bindValue(':metodo_pago', $data['id_metodo_pago']);
 
         $stmt->execute();
@@ -174,16 +185,12 @@ class Encomiendas_model {
         ];
     }
 
-    /**
-     * Inserta el detalle del bulto usando el código correlativo derivado de la guía padre (Ej: ENC-000001-01)
-     */
     public function insertarDetalleEncomienda($id_encomienda, $guia_padre, $index_bulto, $bulto) {
         $sql = "INSERT INTO detalles_encomiendas 
             (id_encomienda, codigo_detalle_encomienda, descripcion_detalle_encomienda, peso_detalle_encomienda, id_encomienda_contenido, subtotal_detalle_encomienda, estado_detalle_encomienda, create_detalle_encomienda) 
             VALUES 
             (:id_encomienda, :codigo, :descripcion, :peso, :id_contenido, :subtotal, 1, NOW())";
 
-        // Formatea el subcódigo correlativo: ENC-000001-01, ENC-000001-02, etc.
         $codigoDetalle = $guia_padre . '-' . str_pad($index_bulto, 2, '0', STR_PAD_LEFT);
         $peso = (!empty($bulto['peso']) && floatval($bulto['peso']) > 0) ? floatval($bulto['peso']) : null;
 
@@ -237,7 +244,6 @@ class Encomiendas_model {
                 return null;
             }
 
-            // Obtener bultos/detalles vinculados
             $sqlDetalles = "SELECT 
                                 de.*,
                                 ec.nombre_encomienda_contenido
@@ -255,9 +261,6 @@ class Encomiendas_model {
         }
     }
 
-    /**
-     * Registra el ingreso/recepción de una encomienda recibida desde otra sucursal.
-     */
     public function insertarRecepcionEncomienda($data) {
         $sql = "INSERT INTO encomiendas 
             (guia_encomienda, id_sucursal_origen, id_sucursal_destino, id_persona_remitente, id_persona_destinatario, id_turno, id_historial_caja, id_usuario, declaracion_encomienda, monto_encomienda, estado_pago_encomienda, id_metodo_pago, id_estado_encomienda, estado_encomienda, create_encomienda) 
@@ -304,13 +307,6 @@ class Encomiendas_model {
         ]);
     }
 
-    /**
-     * Resuelve el id_estado_encomienda correspondiente a "Entregado" por NOMBRE en vez
-     * de asumir un id fijo (el script de BD no trae datos semilla de estados_encomiendas,
-     * así que un "3" hardcodeado no se puede verificar contra el modelo y es frágil si
-     * los estados se sembraron en otro orden). Si por algún motivo no existe un estado
-     * con ese nombre, cae de vuelta a 3 para no romper instalaciones ya en producción.
-     */
     private function obtenerIdEstadoEntregado() {
         $sql = "SELECT id_estado_encomienda 
                 FROM estados_encomiendas 
@@ -321,11 +317,6 @@ class Encomiendas_model {
         return $res ? intval($res['id_estado_encomienda']) : 3;
     }
 
-    /**
-     * Marca la encomienda como Entregada. Al completarse la entrega el saldo queda
-     * liquidado (ya sea porque se pagó en origen, o porque se acaba de cobrar el COD
-     * en destino), así que estado_pago_encomienda siempre pasa a 1 (Pagado).
-     */
     public function marcarComoEntregada($id_encomienda) {
         $idEstadoEntregado = $this->obtenerIdEstadoEntregado();
 
@@ -339,10 +330,6 @@ class Encomiendas_model {
         ]);
     }
 
-    /**
-     * Trae la última entrega registrada para una encomienda, junto con los datos de
-     * quien retiró y el método de pago usado, para el acta de entrega imprimible.
-     */
     public function obtenerUltimaEntrega($id_encomienda) {
         try {
             $sql = "SELECT 
@@ -355,7 +342,7 @@ class Encomiendas_model {
                     LEFT JOIN personas p ON ee.id_persona_retiro = p.id_persona
                     LEFT JOIN metodos_pagos mp ON ee.id_metodo_pago = mp.id_metodo_pago
                     WHERE ee.id_encomienda = :id
-                    ORDER BY ee.id_entrega_encomienda DESC
+                    ORDER BY ee.id_entrega_encomienda DESCT
                     LIMIT 1";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([':id' => $id_encomienda]);

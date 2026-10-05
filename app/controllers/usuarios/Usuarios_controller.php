@@ -2,63 +2,60 @@
 require_once __DIR__ . '/../../models/usuarios/Usuarios_model.php';
 require_once __DIR__ . '/../../models/personas/Personas_model.php';
 require_once __DIR__ . '/../../helpers/auth/ValidarPersona.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarPassword.php';
 
 class Usuarios_controller {
     private $usuariosModel;
     private $personasModel;
 
     public function __construct() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         $this->usuariosModel = new Usuarios_model();
         $this->personasModel = new Personas_model();
+    }
+
+    private function idSindicato() {
+        return (int)($_SESSION['id_sindicato'] ?? 0);
+    }
+
+    private function vista($vista, array $datos) {
+        $viewPath   = __DIR__ . '/../../views/dashboard/';
+        $menuActivo = 'usuarios';
+        extract($datos);
+
+        require_once $viewPath . 'layouts/header.php';
+        require_once $viewPath . 'layouts/sidebar.php';
+        require_once $viewPath . 'layouts/navbar.php';
+
+        if (file_exists($viewPath . $vista . '.php')) {
+            require_once $viewPath . $vista . '.php';
+        }
+
+        require_once $viewPath . 'layouts/footer.php';
+        require_once $viewPath . 'layouts/script.php';
     }
 
     /* ============================ VISTAS ============================ */
 
     public function index() {
-        $viewPath   = __DIR__ . '/../../views/dashboard/';
-        $menuActivo = 'usuarios';
-
-        $usuarios          = $this->usuariosModel->getUsuarios();
-        $idUsuarioActual   = $_SESSION['id_usuario'] ?? 0;
-
-        require_once $viewPath . 'layouts/header.php';
-        require_once $viewPath . 'layouts/sidebar.php';
-        require_once $viewPath . 'layouts/navbar.php';
-
-        if (file_exists($viewPath . 'usuarios/index.php')) {
-            require_once $viewPath . 'usuarios/index.php';
-        }
-
-        require_once $viewPath . 'layouts/footer.php';
-        require_once $viewPath . 'layouts/script.php';
+        $this->vista('usuarios/index', [
+            'usuarios'        => $this->usuariosModel->getUsuarios($this->idSindicato()),
+            'idUsuarioActual' => $_SESSION['id_usuario'] ?? 0,
+        ]);
     }
 
     public function new() {
-        $viewPath   = __DIR__ . '/../../views/dashboard/';
-        $menuActivo = 'usuarios';
-
-        $roles      = $this->usuariosModel->getRolesActivos();
-        $sucursales = $this->usuariosModel->getSucursalesActivas();
-
-        require_once $viewPath . 'layouts/header.php';
-        require_once $viewPath . 'layouts/sidebar.php';
-        require_once $viewPath . 'layouts/navbar.php';
-
-        if (file_exists($viewPath . 'usuarios/new.php')) {
-            require_once $viewPath . 'usuarios/new.php';
-        }
-
-        require_once $viewPath . 'layouts/footer.php';
-        require_once $viewPath . 'layouts/script.php';
+        $this->vista('usuarios/new', [
+            'roles'      => $this->usuariosModel->getRolesActivos(),
+            'sucursales' => $this->usuariosModel->getSucursalesActivas($this->idSindicato()),
+        ]);
     }
 
-    /** Formulario de edición: /usuarios/update?id=X */
     public function update() {
-        $viewPath   = __DIR__ . '/../../views/dashboard/';
-        $menuActivo = 'usuarios';
-
         $id = intval($_GET['id'] ?? 0);
-        $usuario = $id > 0 ? $this->usuariosModel->obtenerUsuario($id) : null;
+        $usuario = $id > 0 ? $this->usuariosModel->obtenerUsuario($id, $this->idSindicato()) : null;
 
         if (!$usuario) {
             Flash::set(false, 'El usuario no existe o fue eliminado.', 'Usuario no encontrado');
@@ -66,31 +63,22 @@ class Usuarios_controller {
             exit;
         }
 
-        $roles      = $this->usuariosModel->getRolesActivos();
-        $sucursales = $this->usuariosModel->getSucursalesActivas();
-
-        require_once $viewPath . 'layouts/header.php';
-        require_once $viewPath . 'layouts/sidebar.php';
-        require_once $viewPath . 'layouts/navbar.php';
-
-        if (file_exists($viewPath . 'usuarios/update.php')) {
-            require_once $viewPath . 'usuarios/update.php';
-        }
-
-        require_once $viewPath . 'layouts/footer.php';
-        require_once $viewPath . 'layouts/script.php';
+        $this->vista('usuarios/update', [
+            'usuario'    => $usuario,
+            'roles'      => $this->usuariosModel->getRolesActivos(),
+            'sucursales' => $this->usuariosModel->getSucursalesActivas($this->idSindicato()),
+        ]);
     }
 
     /* ============================ AJAX / JSON ============================ */
 
-    /** Detalle para el modal (nunca devuelve el hash de la contraseña). */
     public function detalle() {
         $id = intval($_GET['id'] ?? 0);
         if ($id <= 0) {
             $this->json(['success' => false, 'message' => 'Identificador de usuario no válido.']);
         }
 
-        $usuario = $this->usuariosModel->obtenerUsuario($id);
+        $usuario = $this->usuariosModel->obtenerUsuario($id, $this->idSindicato());
         if (!$usuario) {
             $this->json(['success' => false, 'message' => 'El usuario no existe o fue eliminado.']);
         }
@@ -98,9 +86,8 @@ class Usuarios_controller {
         $this->json(['success' => true, 'data' => $usuario]);
     }
 
-    /** Busca una persona por C.I. para autocompletar el formulario "Nuevo". */
     public function buscarPersona() {
-        $ci = trim($_GET['ci'] ?? '');
+        $ci = ValidarPersona::normalizarCi($_GET['ci'] ?? '');
         if ($ci === '') {
             $this->json(['success' => false]);
         }
@@ -123,7 +110,7 @@ class Usuarios_controller {
                 $this->json(['success' => false, 'message' => 'Método no permitido']);
             }
 
-            $ci        = trim($_POST['ci'] ?? '');
+            $ci        = ValidarPersona::normalizarCi($_POST['ci'] ?? '');
             $nombres   = trim($_POST['nombres'] ?? '');
             $paterno   = trim($_POST['paterno'] ?? '');
             $materno   = trim($_POST['materno'] ?? '');
@@ -134,17 +121,24 @@ class Usuarios_controller {
             $password  = (string)($_POST['password'] ?? '');
             $password2 = (string)($_POST['password_confirm'] ?? '');
 
-            if ($ci === '' || $nombres === '' || $paterno === '' || $celular === '') {
-                $this->json(['success' => false, 'message' => 'C.I., nombres, apellido paterno y celular son obligatorios.']);
+            $error = ValidarPersona::validar($ci, $nombres, $paterno, $materno, $celular);
+            if ($error !== null) {
+                $this->json(['success' => false, 'message' => $error]);
             }
             if ($idRol <= 0 || $idSucursal <= 0) {
                 $this->json(['success' => false, 'message' => 'Seleccione el rol y la sucursal.']);
             }
-            if (strlen($password) < 6) {
-                $this->json(['success' => false, 'message' => 'La contraseña debe tener al menos 6 caracteres.']);
+            $error = ValidarPassword::validar($password, $password2);
+            if ($error !== null) {
+                $this->json(['success' => false, 'message' => $error]);
             }
-            if ($password !== $password2) {
-                $this->json(['success' => false, 'message' => 'Las contraseñas no coinciden.']);
+
+            // Alcance: la sucursal debe ser de MI sindicato y el rol debe estar vigente
+            if (!$this->usuariosModel->sucursalValida($idSucursal, $this->idSindicato())) {
+                $this->json(['success' => false, 'message' => 'La sucursal seleccionada no pertenece a su sindicato o está inactiva.']);
+            }
+            if (!$this->usuariosModel->rolValido($idRol)) {
+                $this->json(['success' => false, 'message' => 'El rol seleccionado no existe o está inactivo.']);
             }
 
             global $pdo;
@@ -189,7 +183,7 @@ class Usuarios_controller {
             }
 
             $idUsuario = intval($_POST['id_usuario'] ?? 0);
-            $usuario   = $idUsuario > 0 ? $this->usuariosModel->obtenerUsuario($idUsuario) : null;
+            $usuario   = $idUsuario > 0 ? $this->usuariosModel->obtenerUsuario($idUsuario, $this->idSindicato()) : null;
             if (!$usuario) {
                 $this->json(['success' => false, 'message' => 'El usuario no existe o fue eliminado.']);
             }
@@ -205,7 +199,6 @@ class Usuarios_controller {
             $password  = (string)($_POST['password'] ?? '');
             $password2 = (string)($_POST['password_confirm'] ?? '');
 
-            // Valida C.I. (mismo formato que el login), nombres y celular
             $error = ValidarPersona::validar($ci, $nombres, $paterno, $materno, $celular);
             if ($error !== null) {
                 $this->json(['success' => false, 'message' => $error]);
@@ -214,19 +207,24 @@ class Usuarios_controller {
                 $this->json(['success' => false, 'message' => 'Seleccione el rol y la sucursal.']);
             }
             if ($password !== '') {
-                if (strlen($password) < 6) {
-                    $this->json(['success' => false, 'message' => 'La nueva contraseña debe tener al menos 6 caracteres.']);
+                $error = ValidarPassword::validar($password, $password2);
+                if ($error !== null) {
+                    $this->json(['success' => false, 'message' => $error]);
                 }
-                if ($password !== $password2) {
-                    $this->json(['success' => false, 'message' => 'Las contraseñas no coinciden.']);
-                }
+            }
+
+            // Alcance: sucursal de MI sindicato y rol vigente
+            if (!$this->usuariosModel->sucursalValida($idSucursal, $this->idSindicato())) {
+                $this->json(['success' => false, 'message' => 'La sucursal seleccionada no pertenece a su sindicato o está inactiva.']);
+            }
+            if (!$this->usuariosModel->rolValido($idRol)) {
+                $this->json(['success' => false, 'message' => 'El rol seleccionado no existe o está inactivo.']);
             }
 
             global $pdo;
             $pdo->beginTransaction();
 
             try {
-                // C.I. modificado: no puede pertenecer a OTRA persona
                 if (strcasecmp($ci, (string)$usuario['carnet_persona']) !== 0) {
                     $otra = $this->personasModel->buscarPorCi($ci);
                     if ($otra && (int)$otra['id_persona'] !== (int)$usuario['id_persona']) {
@@ -264,7 +262,6 @@ class Usuarios_controller {
         }
     }
 
-    /** Activar / desactivar cuenta (reversible). */
     public function cambiarEstado() {
         try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -281,8 +278,8 @@ class Usuarios_controller {
                 $this->json(['success' => false, 'message' => 'No puede desactivar su propia cuenta.']);
             }
 
-            if (!$this->usuariosModel->cambiarEstado($id, $estado)) {
-                $this->json(['success' => false, 'message' => 'No se pudo cambiar el estado (el usuario no existe o no hubo cambios).']);
+            if (!$this->usuariosModel->cambiarEstado($id, $estado, $this->idSindicato())) {
+                $this->json(['success' => false, 'message' => 'No se pudo cambiar el estado (el usuario no existe, no es de su sindicato o no hubo cambios).']);
             }
 
             Flash::set(true, $estado ? 'La cuenta fue activada.' : 'La cuenta fue desactivada.', 'Estado Actualizado');
@@ -293,7 +290,6 @@ class Usuarios_controller {
         }
     }
 
-    /** Borrado suave. */
     public function eliminar() {
         try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -308,9 +304,8 @@ class Usuarios_controller {
                 $this->json(['success' => false, 'message' => 'No puede eliminar su propia cuenta.']);
             }
 
-            $fyh = date('Y-m-d H:i:s');
-            if (!$this->usuariosModel->Eliminar_usuario($id, $fyh)) {
-                $this->json(['success' => false, 'message' => 'No se pudo eliminar: el usuario no existe o ya fue eliminado.']);
+            if (!$this->usuariosModel->Eliminar_usuario($id, date('Y-m-d H:i:s'), $this->idSindicato())) {
+                $this->json(['success' => false, 'message' => 'No se pudo eliminar: el usuario no existe, ya fue eliminado o no es de su sindicato.']);
             }
 
             Flash::set(true, 'El usuario fue eliminado correctamente.', 'Usuario Eliminado');
