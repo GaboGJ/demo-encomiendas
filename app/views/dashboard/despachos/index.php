@@ -110,7 +110,7 @@ function cancelarTurno(id) {
 
     <?php if ($esEnTurno): ?>
       <!-- Si está en turno: Asignar pasajes/encomiendas y Cancelar turno -->
-      <a href="<?= URL ?>/despachos/asignar?id=<?= (int)$d['id_turno'] ?>" 
+      <a href="<?= URL ?>/despachos/asign?id=<?= (int)$d['id_turno'] ?>" 
          class="btn btn-link text-success p-2 mb-0" 
          data-bs-toggle="tooltip" 
          title="Asignar Pasajes y Encomiendas">

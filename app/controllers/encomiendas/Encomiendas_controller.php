@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../models/personas/Personas_model.php';
 require_once __DIR__ . '/../../models/sucursales/Sucursales_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
 require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
+require_once __DIR__ . '/../../helpers/cajas/CajaGuardada.php';
+CajaGuardada::requerir('encomiendas');
 
 class Encomiendas_controller {
     const MAX_MONTO = 99999999.99;
@@ -502,6 +504,11 @@ class Encomiendas_controller {
             Flash::set(false, 'La encomienda no fue encontrada.', 'Error');
             header('Location: ' . rtrim(URL, '/') . '/encomiendas');
             exit;
+        }
+
+        if ((int)$encomienda['estado_pago_encomienda'] === 0) {
+            require_once __DIR__ . '/../../helpers/cajas/CajaGuardada.php';
+            CajaGuardada::requerir('encomiendas', 'Esta guía es contra entrega (COD). Para cobrarla debe aperturar una caja.');
         }
 
         $metodos_pago = $this->metodosPagosModel->getMetodosPagosActivos();

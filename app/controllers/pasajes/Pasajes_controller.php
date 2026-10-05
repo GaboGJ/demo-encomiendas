@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../models/despachos/Despachos_model.php';
 require_once __DIR__ . '/../../models/elementos/Elementos_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
 require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
+require_once __DIR__ . '/../../helpers/cajas/CajaGuardada.php';
+CajaGuardada::requerir('pasajes');
 
 class Pasajes_controller {
 
@@ -58,8 +60,10 @@ class Pasajes_controller {
     }
 
     public function new() {
+        
         $viewPath = __DIR__ . '/../../views/dashboard/';
         $menuActivo = 'pasajes';
+       
 
         $id_sucursal_actual = $_SESSION['id_sucursal'] ?? 1;
         $turnos_disponibles = $this->despachosModel->getTurnosEnTurnoPorSucursal($id_sucursal_actual);
