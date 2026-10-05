@@ -1,12 +1,11 @@
 <?php
 /**
  * helpers/rutas/ValidarRutas.php
- * Normalización y validación del módulo Rutas (sindicato + precio de pasaje + tarifas de encomienda).
- * validar() devuelve null si todo es válido o el mensaje de error.
+ * Se permiten varias tarifas por tipo de contenido siempre que sus rangos de peso no se solapen.
  */
 class ValidarRutas {
 
-    const MAX_TARIFAS = 30;
+    const MAX_TARIFAS = 50;
     const MAX_MONTO   = 99999999.99;
     const MAX_PESO    = 99999999.99;
 
@@ -31,11 +30,11 @@ class ValidarRutas {
         }
 
         return [
-            'id_origen'   => intval($post['id_origen'] ?? 0),
-            'id_destino'  => intval($post['id_destino'] ?? 0),
-            'id_sindicato'=> intval($post['id_sindicato'] ?? 0),
-            'precio'      => self::numero($post['precio_pasaje'] ?? ''),
-            'tarifas'     => $norm,
+            'id_origen'    => intval($post['id_origen'] ?? 0),
+            'id_destino'   => intval($post['id_destino'] ?? 0),
+            'id_sindicato' => intval($post['id_sindicato'] ?? 0),
+            'precio'       => self::numero($post['precio_pasaje'] ?? ''),
+            'tarifas'      => $norm,
         ];
     }
 
@@ -56,17 +55,11 @@ class ValidarRutas {
             return 'Se admiten como máximo ' . self::MAX_TARIFAS . ' tarifas de encomienda por ruta.';
         }
 
-        $vistos = [];
         foreach ($d['tarifas'] as $i => $t) {
             $n = $i + 1;
             if ($t['id_contenido'] <= 0) {
                 return "Tarifa #$n: seleccione el tipo de contenido.";
             }
-            if (isset($vistos[$t['id_contenido']])) {
-                return "Tarifa #$n: ese tipo de contenido ya está en la lista (una tarifa por tipo).";
-            }
-            $vistos[$t['id_contenido']] = true;
-
             if ($t['precio'] === null || $t['precio'] <= 0 || $t['precio'] > self::MAX_MONTO) {
                 return "Tarifa #$n: indique un precio válido (mayor a 0).";
             }
@@ -75,6 +68,19 @@ class ValidarRutas {
             }
             if ($t['peso_min'] !== null && ($t['peso_min'] < 0 || $t['peso_min'] > $t['peso_max'])) {
                 return "Tarifa #$n: el peso mínimo no puede ser negativo ni mayor al máximo.";
+            }
+        }
+
+        // Mismo tipo de contenido: los rangos de peso no pueden solaparse
+        $n = count($d['tarifas']);
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = $i + 1; $j < $n; $j++) {
+                $a = $d['tarifas'][$i]; $b = $d['tarifas'][$j];
+                if ($a['id_contenido'] !== $b['id_contenido']) continue;
+                $aMin = $a['peso_min'] ?? 0; $bMin = $b['peso_min'] ?? 0;
+                if ($aMin <= $b['peso_max'] && $bMin <= $a['peso_max']) {
+                    return 'Las tarifas #' . ($i + 1) . ' y #' . ($j + 1) . ' son del mismo tipo de contenido y sus rangos de peso se solapan.';
+                }
             }
         }
         return null;

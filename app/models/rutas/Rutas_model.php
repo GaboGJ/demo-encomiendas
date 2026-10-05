@@ -2,10 +2,7 @@
 /**
  * Rutas_model
  * Una ruta = (sucursal origen -> sucursal destino) de UN sindicato.
- *   - precios_pasajes     : precio base del pasaje (UK origen+destino+sindicato, cuenta también las eliminadas).
- *   - tarifas_encomiendas : tarifas por tipo de contenido de ese mismo trío.
- * Borrado suave con el MISMO timestamp en la ruta y sus tarifas (al restaurar vuelven solo las suyas).
- * Se lista por el sindicato del ORIGEN (sucursales.id_sindicato); el sindicato de la ruta es precios_pasajes.id_sindicato.
+ * El listado muestra las rutas de TODOS los sindicatos.
  */
 class Rutas_model {
     private $pdo;
@@ -23,6 +20,7 @@ class Rutas_model {
                 AND te.id_sucursal_destino = pp.id_sucursal_destino
                 AND te.id_sindicato = pp.id_sindicato
                 AND te.delete_tarifa_encomienda IS NULL";
+        // OJO: termina con espacio para poder concatenar el WHERE
         return "SELECT
                     pp.id_precio_pasaje,
                     pp.id_sucursal_origen,
@@ -45,57 +43,51 @@ class Rutas_model {
                 FROM precios_pasajes pp
                 INNER JOIN sucursales so ON pp.id_sucursal_origen = so.id_sucursal
                 INNER JOIN sucursales sd ON pp.id_sucursal_destino = sd.id_sucursal
-                INNER JOIN sindicatos sn ON pp.id_sindicato = sn.id_sindicato";
+                INNER JOIN sindicatos sn ON pp.id_sindicato = sn.id_sindicato ";
     }
 
-    /* ---------------- Lecturas ---------------- */
+    /* ---------------- Lecturas (todas las rutas, de todos los sindicatos) ---------------- */
 
-    public function getRutas($id_sindicato) {
+    public function getRutas() {
         try {
-            $st = $this->pdo->prepare($this->baseSelect() .
-                "WHERE so.id_sindicato = :s AND pp.delete_precio_pasaje IS NULL
-                 ORDER BY so.ciudad_sucursal ASC, sd.ciudad_sucursal ASC, sn.nombre_sindicato ASC");
-            $st->execute([':s' => $id_sindicato]);
-            return $st->fetchAll(PDO::FETCH_ASSOC);
+            return $this->pdo->query($this->baseSelect() .
+                "WHERE pp.delete_precio_pasaje IS NULL
+                 ORDER BY so.ciudad_sucursal ASC, sd.ciudad_sucursal ASC, sn.nombre_sindicato ASC")
+                ->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Rutas_model::getRutas: ' . $e->getMessage());
             return [];
         }
     }
 
-    public function getEliminados($id_sindicato) {
+    public function getEliminados() {
         try {
-            $st = $this->pdo->prepare($this->baseSelect() .
-                "WHERE so.id_sindicato = :s AND pp.delete_precio_pasaje IS NOT NULL
-                 ORDER BY pp.delete_precio_pasaje DESC");
-            $st->execute([':s' => $id_sindicato]);
-            return $st->fetchAll(PDO::FETCH_ASSOC);
+            return $this->pdo->query($this->baseSelect() .
+                "WHERE pp.delete_precio_pasaje IS NOT NULL
+                 ORDER BY pp.delete_precio_pasaje DESC")
+                ->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Rutas_model::getEliminados: ' . $e->getMessage());
             return [];
         }
     }
 
-    public function contarEliminados($id_sindicato) {
+    public function contarEliminados() {
         try {
-            $st = $this->pdo->prepare(
-                "SELECT COUNT(*) FROM precios_pasajes pp
-                 INNER JOIN sucursales so ON pp.id_sucursal_origen = so.id_sucursal
-                 WHERE so.id_sindicato = :s AND pp.delete_precio_pasaje IS NOT NULL"
-            );
-            $st->execute([':s' => $id_sindicato]);
-            return (int)$st->fetchColumn();
+            return (int)$this->pdo->query(
+                "SELECT COUNT(*) FROM precios_pasajes WHERE delete_precio_pasaje IS NOT NULL"
+            )->fetchColumn();
         } catch (PDOException $e) {
             return 0;
         }
     }
 
-    public function obtenerRuta($id, $id_sindicato, $incluirEliminados = false) {
+    public function obtenerRuta($id, $incluirEliminados = false) {
         try {
-            $sql = $this->baseSelect() . "WHERE pp.id_precio_pasaje = :id AND so.id_sindicato = :s";
+            $sql = $this->baseSelect() . "WHERE pp.id_precio_pasaje = :id";
             if (!$incluirEliminados) $sql .= " AND pp.delete_precio_pasaje IS NULL";
             $st = $this->pdo->prepare($sql . " LIMIT 1");
-            $st->execute([':id' => $id, ':s' => $id_sindicato]);
+            $st->execute([':id' => $id]);
             return $st->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (PDOException $e) {
             error_log('Rutas_model::obtenerRuta: ' . $e->getMessage());
@@ -112,7 +104,7 @@ class Rutas_model {
                  INNER JOIN encomiendas_contenidos ec ON te.id_encomienda_contenido = ec.id_encomienda_contenido
                  WHERE te.id_sucursal_origen = :o AND te.id_sucursal_destino = :d AND te.id_sindicato = :s
                    AND te.delete_tarifa_encomienda IS NULL
-                 ORDER BY ec.nombre_encomienda_contenido ASC"
+                 ORDER BY ec.nombre_encomienda_contenido ASC, te.peso_minimo ASC, te.peso_maximo ASC"
             );
             $st->execute([':o' => $id_origen, ':d' => $id_destino, ':s' => $id_sindicato]);
             return $st->fetchAll(PDO::FETCH_ASSOC);
@@ -121,7 +113,6 @@ class Rutas_model {
         }
     }
 
-    /** Sucursales vigentes del sindicato (para ubicar la sucursal del usuario). */
     public function getOrigenes($id_sindicato) {
         try {
             $st = $this->pdo->prepare(
@@ -136,7 +127,6 @@ class Rutas_model {
         }
     }
 
-    /** Todas las sucursales vigentes (posibles destinos). */
     public function getDestinos() {
         try {
             return $this->pdo->query(
@@ -149,7 +139,6 @@ class Rutas_model {
         }
     }
 
-    /** Sindicatos activos; $soloId > 0 limita a uno (usuarios que no son del principal). */
     public function getSindicatos($soloId = 0) {
         try {
             $sql = "SELECT id_sindicato, nombre_sindicato, sigla_sindicato FROM sindicatos
@@ -204,6 +193,7 @@ class Rutas_model {
     }
 
     public function contenidosValidos(array $ids) {
+        $ids = array_values(array_unique(array_map('intval', $ids)));
         if (!$ids) return 0;
         $in = implode(',', array_fill(0, count($ids), '?'));
         $st = $this->pdo->prepare(
@@ -215,7 +205,6 @@ class Rutas_model {
         return (int)$st->fetchColumn();
     }
 
-    /** ¿Ya existe la ruta de ese sindicato (vigente O eliminada)? */
     public function buscarDuplicado($id_origen, $id_destino, $id_sindicato, $excluirId = 0) {
         $st = $this->pdo->prepare(
             "SELECT delete_precio_pasaje FROM precios_pasajes
@@ -227,7 +216,6 @@ class Rutas_model {
         return $f ? ['eliminado' => $f['delete_precio_pasaje'] !== null] : null;
     }
 
-    /** ¿Hay turnos abiertos de vehículos de ese sindicato en esta ruta? */
     public function tieneTurnosAbiertos($id_origen, $id_destino, $id_sindicato) {
         $st = $this->pdo->prepare(
             "SELECT COUNT(*) FROM turnos t
@@ -286,54 +274,29 @@ class Rutas_model {
         }
     }
 
-    /** Upsert por tipo de contenido (reactiva bajas); lo que ya no está en la lista se da de baja. Dentro de una transacción. */
+    /**
+     * Reemplaza las tarifas ACTIVAS de la ruta por la lista recibida.
+     * Se permiten varias tarifas por tipo de contenido (distintos rangos de peso).
+     * Ninguna tabla referencia tarifas_encomiendas, por eso se puede borrar y reinsertar.
+     * Las filas ya dadas de baja (papelera) no se tocan.
+     */
     private function sincronizarTarifas($o, $d, $s, array $tarifas, $estado) {
-        $st = $this->pdo->prepare(
-            "SELECT id_tarifa_encomienda, id_encomienda_contenido, delete_tarifa_encomienda
-             FROM tarifas_encomiendas WHERE id_sucursal_origen = :o AND id_sucursal_destino = :d AND id_sindicato = :s
-             ORDER BY id_tarifa_encomienda ASC FOR UPDATE"
-        );
-        $st->execute([':o' => $o, ':d' => $d, ':s' => $s]);
-        $existentes = [];
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) {
-            $k = (int)$f['id_encomienda_contenido'];
-            if (!isset($existentes[$k])) $existentes[$k] = $f;
-        }
+        $this->pdo->prepare(
+            "DELETE FROM tarifas_encomiendas
+             WHERE id_sucursal_origen = :o AND id_sucursal_destino = :d AND id_sindicato = :s
+               AND delete_tarifa_encomienda IS NULL"
+        )->execute([':o' => $o, ':d' => $d, ':s' => $s]);
 
-        $upd = $this->pdo->prepare(
-            "UPDATE tarifas_encomiendas SET peso_minimo = :pmin, peso_maximo = :pmax, precio_tarifa_encomienda = :p,
-                    estado_tarifa_encomienda = :e, delete_tarifa_encomienda = NULL, update_tarifa_encomienda = NOW()
-             WHERE id_tarifa_encomienda = :id"
-        );
         $ins = $this->pdo->prepare(
             "INSERT INTO tarifas_encomiendas
                 (id_sucursal_origen, id_sucursal_destino, id_sindicato, id_encomienda_contenido, peso_minimo, peso_maximo,
                  precio_tarifa_encomienda, estado_tarifa_encomienda, create_tarifa_encomienda)
              VALUES (:o, :d, :s, :c, :pmin, :pmax, :p, :e, NOW())"
         );
-
-        $conservados = [];
         foreach ($tarifas as $t) {
-            $c = (int)$t['id_contenido'];
-            $conservados[$c] = true;
-            if (isset($existentes[$c])) {
-                $upd->execute([':pmin' => $t['peso_min'], ':pmax' => $t['peso_max'], ':p' => $t['precio'],
-                               ':e' => (int)$estado, ':id' => $existentes[$c]['id_tarifa_encomienda']]);
-            } else {
-                $ins->execute([':o' => $o, ':d' => $d, ':s' => $s, ':c' => $c, ':pmin' => $t['peso_min'],
-                               ':pmax' => $t['peso_max'], ':p' => $t['precio'], ':e' => (int)$estado]);
-            }
-        }
-
-        $baja = $this->pdo->prepare(
-            "UPDATE tarifas_encomiendas SET estado_tarifa_encomienda = 0, delete_tarifa_encomienda = NOW()
-             WHERE id_sucursal_origen = :o AND id_sucursal_destino = :d AND id_sindicato = :s
-               AND id_encomienda_contenido = :c AND delete_tarifa_encomienda IS NULL"
-        );
-        foreach ($existentes as $c => $f) {
-            if (!isset($conservados[$c]) && $f['delete_tarifa_encomienda'] === null) {
-                $baja->execute([':o' => $o, ':d' => $d, ':s' => $s, ':c' => $c]);
-            }
+            $ins->execute([':o' => $o, ':d' => $d, ':s' => $s, ':c' => (int)$t['id_contenido'],
+                           ':pmin' => $t['peso_min'], ':pmax' => $t['peso_max'], ':p' => $t['precio'],
+                           ':e' => (int)$estado]);
         }
     }
 

@@ -19,14 +19,14 @@
           <h6 class="text-dark font-weight-bolder mt-2 mb-0" id="detRutNombre">-</h6>
           <span class="badge badge-sm bg-gradient-success border-radius-pill mt-1" id="detRutEstado">-</span>
         </div>
-                  <div class="col-12">
+
+        <div class="row g-3 mb-3">
+          <div class="col-12">
             <div class="p-3 bg-gray-100 border-radius-md">
               <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block">Sindicato</span>
               <p class="text-xs font-weight-bold text-dark mb-0" id="detRutSindicato">-</p>
             </div>
           </div>
-
-        <div class="row g-3 mb-3">
           <div class="col-6">
             <div class="p-3 bg-gray-100 border-radius-md h-100">
               <span class="text-xxs font-weight-bolder text-uppercase text-secondary d-block">Origen</span>
@@ -84,12 +84,13 @@ function verDetalleRuta(idRuta) {
       }
 
       const d = res.data;
-      setTxt('detRutSindicato', d.nombre_sindicato);
+      // Las utilidades se definen ANTES de usarlas
       const setTxt = (id, v) => { document.getElementById(id).textContent = (v !== null && v !== undefined && String(v).trim() !== '') ? v : '-'; };
       const fecha = f => f ? f.substring(0, 10).split('-').reverse().join('/') : '-';
       const esc = s => { const x = document.createElement('div'); x.textContent = s == null ? '' : String(s); return x.innerHTML; };
       const bs = n => 'Bs. ' + (parseFloat(n) || 0).toFixed(2);
 
+      setTxt('detRutSindicato', d.nombre_sindicato);
       setTxt('detRutNombre', d.ciudad_origen + ' ➔ ' + d.ciudad_destino);
       setTxt('detRutOrigen', d.ciudad_origen + ' (' + d.nombre_origen + ')');
       setTxt('detRutDestino', d.ciudad_destino + ' (' + d.nombre_destino + ')');

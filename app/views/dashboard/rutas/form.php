@@ -47,7 +47,7 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
                                : ($origen ? $origen['ciudad_sucursal'] . ' (' . $origen['nombre_sucursal'] . ')' : 'Sin sucursal asignada');
                   ?>
                   <div class="input-group input-group-outline is-filled my-2">
-                    <label class="form-label">Origen (su sucursal)</label>
+                    <label class="form-label"><?= $esEdicion ? 'Origen' : 'Origen (su sucursal)' ?></label>
                     <input type="text" class="form-control bg-gray-100" value="<?= $h($origenTxt) ?>" readonly>
                   </div>
 
@@ -105,7 +105,7 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
                       <i class="material-symbols-rounded text-sm">add</i> Agregar tarifa
                     </button>
                   </div>
-                  <p class="text-xxs text-secondary mb-2">Una tarifa por tipo de contenido. El peso mínimo es opcional; el máximo es obligatorio. Dejar la ruta sin tarifas es opcional.</p>
+                  <p class="text-xxs text-secondary mb-2">Puede agregar varias tarifas por tipo de contenido usando rangos de peso distintos (sin solaparse). El peso mínimo es opcional; el máximo es obligatorio.</p>
 
                   <?php if (empty($contenidos)): ?>
                     <p class="text-xxs text-warning font-weight-bold">No hay tipos de contenido registrados en <strong>encomiendas_contenidos</strong>.</p>
@@ -155,7 +155,7 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
   const CONTENIDOS = <?= json_encode(array_map(function ($c) {
       return ['id' => (int)$c['id_encomienda_contenido'], 'nombre' => $c['nombre_encomienda_contenido']];
   }, $contenidos), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
-  // Estado de las tarifas: vive aquí (no en el DOM) para que la paginación de DataTables no pierda datos
+  // El estado vive aquí (no en el DOM) para que la paginación de DataTables no pierda datos
   let tarifas = <?= json_encode(array_map(function ($t) {
       return [
           'id_contenido' => (int)$t['id_encomienda_contenido'],
@@ -175,10 +175,8 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
   const inp = (i, f, v, min) => '<input type="number" min="' + min + '" step="0.01" class="' + cls + '" style="min-width:90px" data-i="' + i + '" data-f="' + f + '" value="' + esc(v) + '">';
 
   function fila(t, i) {
-    const otros = tarifas.map((x, j) => j !== i ? String(x.id_contenido) : null);
     const opts = CONTENIDOS.map(c =>
-      '<option value="' + c.id + '"' + (String(c.id) === String(t.id_contenido) ? ' selected' : '') +
-      (otros.indexOf(String(c.id)) !== -1 ? ' disabled' : '') + '>' + esc(c.nombre) + '</option>').join('');
+      '<option value="' + c.id + '"' + (String(c.id) === String(t.id_contenido) ? ' selected' : '') + '>' + esc(c.nombre) + '</option>').join('');
     return {
       tipo:     '<select class="' + cls + '" style="min-width:150px" data-i="' + i + '" data-f="id_contenido"><option value="">Seleccione...</option>' + opts + '</select>',
       pmin:     inp(i, 'peso_min', t.peso_min, 0),
@@ -192,7 +190,6 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
     if (!dt) return;
     dt.clear();
     dt.rows.add(tarifas.map(fila)).draw(false);
-    document.getElementById('btnAddTarifa').disabled = !CONTENIDOS.length || tarifas.length >= CONTENIDOS.length;
   }
 
   // Delegados sobre la tabla: sirven en cualquier página
@@ -202,7 +199,7 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
   });
   tabla.addEventListener('change', function (e) {
     const el = e.target;
-    if (el.tagName === 'SELECT' && el.dataset.i !== undefined) { tarifas[el.dataset.i].id_contenido = el.value; render(); }
+    if (el.tagName === 'SELECT' && el.dataset.i !== undefined) tarifas[el.dataset.i].id_contenido = el.value;
   });
   tabla.addEventListener('click', function (e) {
     const b = e.target.closest('.t-del');
@@ -211,6 +208,7 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
     render();
   });
 
+  // Sin límite: se pueden agregar tantas tarifas como se necesiten
   document.getElementById('btnAddTarifa').addEventListener('click', function () {
     tarifas.push({ id_contenido: '', peso_min: '', peso_max: '', precio: '' });
     render();

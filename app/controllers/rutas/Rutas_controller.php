@@ -4,11 +4,8 @@ require_once __DIR__ . '/../../helpers/rutas/ValidarRutas.php';
 
 /**
  * Módulo Rutas y Tarifarios.
- *   /rutas · /rutas/new · /rutas/update?id=X · /rutas/papelera
- *   AJAX/JSON: detalle (GET) · guardar · actualizar · cambiarEstado · eliminar · restaurar (POST)
- *
- * El origen es siempre la sucursal del usuario. La ruta pertenece a un sindicato elegido
- * (el principal elige cualquiera; los demás solo el suyo).
+ * Se LISTAN las rutas de todos los sindicatos. Solo se pueden modificar las del
+ * propio sindicato (el sindicato principal puede modificar todas).
  */
 class Rutas_controller {
     private $rutasModel;
@@ -25,8 +22,8 @@ class Rutas_controller {
     public function index() {
         $this->acceso(false);
         $this->vista('rutas/index', [
-            'rutas'         => $this->rutasModel->getRutas($this->idSindicato()),
-            'totalPapelera' => $this->rutasModel->contarEliminados($this->idSindicato()),
+            'rutas'         => $this->rutasModel->getRutas(),
+            'totalPapelera' => $this->rutasModel->contarEliminados(),
         ]);
     }
 
@@ -39,9 +36,14 @@ class Rutas_controller {
         $this->acceso(false);
 
         $id = intval($_GET['id'] ?? 0);
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato()) : null;
+        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id) : null;
         if (!$ruta) {
             Flash::set(false, 'La ruta no existe o fue eliminada.', 'Ruta no encontrada');
+            header('Location: ' . rtrim(URL, '/') . '/rutas');
+            exit;
+        }
+        if (!$this->puedeModificar($ruta)) {
+            Flash::set(false, 'Solo puede modificar las rutas de su propio sindicato.', 'Acceso restringido');
             header('Location: ' . rtrim(URL, '/') . '/rutas');
             exit;
         }
@@ -54,7 +56,7 @@ class Rutas_controller {
 
     public function papelera() {
         $this->acceso(false);
-        $this->vista('rutas/papelera', ['eliminados' => $this->rutasModel->getEliminados($this->idSindicato())]);
+        $this->vista('rutas/papelera', ['eliminados' => $this->rutasModel->getEliminados()]);
     }
 
     /* ============================ AJAX / JSON ============================ */
@@ -63,7 +65,7 @@ class Rutas_controller {
         $this->acceso(true);
 
         $id = intval($_GET['id'] ?? 0);
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato()) : null;
+        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id) : null;
         if (!$ruta) {
             $this->json(['success' => false, 'message' => 'La ruta no existe o fue eliminada.']);
         }
@@ -77,7 +79,7 @@ class Rutas_controller {
         $this->soloPost();
 
         $d = ValidarRutas::normalizar($_POST);
-        $d['id_origen'] = $this->idSucursal(); // siempre la sucursal del usuario
+        $d['id_origen'] = $this->idSucursal();
         if (!$this->esPrincipal()) $d['id_sindicato'] = $this->idSindicato();
         $this->validarDatos($d);
 
@@ -110,14 +112,10 @@ class Rutas_controller {
         $this->acceso(true);
         $this->soloPost();
 
-        $id = intval($_POST['id_ruta'] ?? 0);
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato()) : null;
-        if (!$ruta) {
-            $this->json(['success' => false, 'message' => 'La ruta no existe o fue eliminada.']);
-        }
+        $ruta = $this->rutaModificable(intval($_POST['id_ruta'] ?? 0));
+        $id = (int)$ruta['id_precio_pasaje'];
 
         $d = ValidarRutas::normalizar($_POST);
-        // Origen, destino y sindicato son la identidad de la ruta: no se modifican
         $d['id_origen']    = (int)$ruta['id_sucursal_origen'];
         $d['id_destino']   = (int)$ruta['id_sucursal_destino'];
         $d['id_sindicato'] = (int)$ruta['id_sindicato'];
@@ -138,13 +136,9 @@ class Rutas_controller {
         $this->acceso(true);
         $this->soloPost();
 
-        $id     = intval($_POST['id_ruta'] ?? 0);
         $estado = intval($_POST['estado'] ?? 0) === 1 ? 1 : 0;
-
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato()) : null;
-        if (!$ruta) {
-            $this->json(['success' => false, 'message' => 'La ruta no existe o fue eliminada.']);
-        }
+        $ruta = $this->rutaModificable(intval($_POST['id_ruta'] ?? 0));
+        $id = (int)$ruta['id_precio_pasaje'];
 
         try {
             if ($estado === 0 && $this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato'])) {
@@ -166,11 +160,8 @@ class Rutas_controller {
         $this->acceso(true);
         $this->soloPost();
 
-        $id = intval($_POST['id_ruta'] ?? 0);
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato()) : null;
-        if (!$ruta) {
-            $this->json(['success' => false, 'message' => 'No se pudo eliminar: la ruta no existe o ya fue eliminada.']);
-        }
+        $ruta = $this->rutaModificable(intval($_POST['id_ruta'] ?? 0));
+        $id = (int)$ruta['id_precio_pasaje'];
 
         try {
             if ($this->rutasModel->tieneTurnosAbiertos($ruta['id_sucursal_origen'], $ruta['id_sucursal_destino'], $ruta['id_sindicato'])) {
@@ -193,9 +184,12 @@ class Rutas_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_ruta'] ?? 0);
-        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, $this->idSindicato(), true) : null;
+        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id, true) : null;
         if (!$ruta || $ruta['delete_precio_pasaje'] === null) {
             $this->json(['success' => false, 'message' => 'La ruta no está en la papelera.']);
+        }
+        if (!$this->puedeModificar($ruta)) {
+            $this->json(['success' => false, 'message' => 'Solo puede modificar las rutas de su propio sindicato.']);
         }
 
         try {
@@ -213,9 +207,26 @@ class Rutas_controller {
 
     /* ============================ PRIVADOS ============================ */
 
-    private function idSindicato() { return (int)($_SESSION['id_sindicato'] ?? 1); }
+    private function idSindicato() { return (int)($_SESSION['id_sindicato'] ?? 0); }
     private function idSucursal()  { return (int)($_SESSION['id_sucursal'] ?? 0); }
     private function esPrincipal() { return (int)($_SESSION['es_principal'] ?? 0) === 1; }
+
+    /** El principal modifica todas; los demás solo las de su sindicato. */
+    private function puedeModificar(array $ruta) {
+        return $this->esPrincipal() || (int)$ruta['id_sindicato'] === $this->idSindicato();
+    }
+
+    /** Ruta vigente que el usuario puede modificar; responde JSON y corta si no. */
+    private function rutaModificable($id) {
+        $ruta = $id > 0 ? $this->rutasModel->obtenerRuta($id) : null;
+        if (!$ruta) {
+            $this->json(['success' => false, 'message' => 'La ruta no existe o fue eliminada.']);
+        }
+        if (!$this->puedeModificar($ruta)) {
+            $this->json(['success' => false, 'message' => 'Solo puede modificar las rutas de su propio sindicato.']);
+        }
+        return $ruta;
+    }
 
     private function datosFormulario() {
         $miSucursal = $this->idSucursal();
@@ -239,7 +250,7 @@ class Rutas_controller {
         if ($error !== null) {
             $this->json(['success' => false, 'message' => $error]);
         }
-        $ids = array_column($d['tarifas'], 'id_contenido');
+        $ids = array_values(array_unique(array_column($d['tarifas'], 'id_contenido')));
         if ($ids && $this->rutasModel->contenidosValidos($ids) !== count($ids)) {
             $this->json(['success' => false, 'message' => 'Algún tipo de contenido no existe o está inactivo. Recargue la página.']);
         }
