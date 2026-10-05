@@ -199,6 +199,18 @@ class Despachos_controller {
         }
     }
 
+    /** AJAX POST: id_turno -> cancela el turno (libera asientos y guías). */
+    public function cancelar() {
+        try {
+            $turno = $this->turnoAbiertoPropioOFallar();
+            $this->despachosModel->cancelarTurno($turno['id_turno'], $_SESSION['id_sucursal'] ?? 1);
+            Flash::set(true, 'El turno #T-' . str_pad($turno['id_turno'], 3, '0', STR_PAD_LEFT) . ' fue cancelado. Asientos y guías liberados.', 'Turno Cancelado');
+            $this->json(['success' => true]);
+        } catch (Exception $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     /* ------------------------------ helpers ------------------------------ */
 
     /** Valida POST + que el turno sea de la sucursal del usuario y siga abierto. */

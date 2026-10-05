@@ -352,5 +352,40 @@ class Encomiendas_model {
             return null;
         }
     }
+
+    /** Anula una guía propia que aún no tiene turno ni entrega (borrado suave). */
+    public function anularEncomienda($id, $id_sucursal) {
+        $st = $this->pdo->prepare("UPDATE encomiendas e SET e.estado_encomienda = 0, e.delete_encomienda = NOW(), e.update_encomienda = NOW()
+            WHERE e.id_encomienda = :id AND e.id_sucursal_origen = :o AND e.id_turno IS NULL
+            AND (e.estado_encomienda = 1 OR e.estado_encomienda IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM entregas_encomiendas en WHERE en.id_encomienda = e.id_encomienda)");
+        $st->execute([':id' => $id, ':o' => $id_sucursal]);
+        if ($st->rowCount() === 0) return false;
+        $this->pdo->prepare("UPDATE detalles_encomiendas SET estado_detalle_encomienda = 0, delete_detalle_encomienda = NOW() WHERE id_encomienda = :id")
+            ->execute([':id' => $id]);
+        return true;
+    }
+
+    /** Datos públicos (sin datos personales ni montos) para el rastreo. */
+    public function rastrear($guia) {
+        try {
+            $st = $this->pdo->prepare("SELECT e.guia_encomienda, ee.nombre_estado_encomienda AS estado,
+                    so.ciudad_sucursal AS origen, sd.ciudad_sucursal AS destino, e.create_encomienda, e.id_turno,
+                    t.fecha_salida_turno, t.hora_salida_turno,
+                    (SELECT COUNT(*) FROM detalles_encomiendas de WHERE de.id_encomienda = e.id_encomienda) AS bultos,
+                    (SELECT MAX(en.create_entrega_encomienda) FROM entregas_encomiendas en
+                    WHERE en.id_encomienda = e.id_encomienda AND en.delete_entrega_encomienda IS NULL) AS fecha_entrega
+                FROM encomiendas e
+                INNER JOIN estados_encomiendas ee ON e.id_estado_encomienda = ee.id_estado_encomienda
+                INNER JOIN sucursales so ON e.id_sucursal_origen = so.id_sucursal
+                INNER JOIN sucursales sd ON e.id_sucursal_destino = sd.id_sucursal
+                LEFT JOIN turnos t ON e.id_turno = t.id_turno
+                WHERE UPPER(e.guia_encomienda) = :g AND (e.estado_encomienda = 1 OR e.estado_encomienda IS NULL) LIMIT 1");
+            $st->execute([':g' => strtoupper($guia)]);
+            return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
 }
 ?>

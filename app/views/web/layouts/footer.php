@@ -24,7 +24,7 @@
           <div class="col-6 col-sm-6 col-lg-3">
               <h6 class="text-xs text-uppercase font-weight-bold text-dark mb-3">Servicios</h6>
               <ul class="nav flex-column">
-                  <li class="nav-item mb-2"><a href="javascript:;" class="text-xs text-success font-weight-bold text-decoration-none">Rastreo de Encomiendas</a></li>
+                  <li class="nav-item mb-2"><a href="<?= URL ?>/rastreo" class="text-xs text-success font-weight-bold text-decoration-none">Rastreo de Encomiendas</a></li>
                   <li class="nav-item mb-2"><a href="javascript:;" class="text-xs text-success font-weight-bold text-decoration-none">Panel de Sindicatos</a></li>
                   <li class="nav-item mb-2"><a href="javascript:;" class="text-xs text-success font-weight-bold text-decoration-none">Contáctanos</a></li>
               </ul>

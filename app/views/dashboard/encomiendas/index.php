@@ -122,7 +122,12 @@
                                                                     title="Imprimir Guía">
                                                                 <i class="material-symbols-rounded text-sm">print</i>
                                                             </button>                                                       
-                                                            <!-- <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Anular Guía"><i class="material-symbols-rounded text-sm">delete</i></a> -->
+                                                            <?php if (!in_array($estado, ['asignado', 'enviado', 'entregado'])): ?>
+<button type="button" class="btn btn-link text-danger p-2 mb-0" title="Anular Guía"
+        onclick="anularGuia(<?= (int)$envio['id_encomienda'] ?>, '<?= htmlspecialchars($envio['guia_encomienda'], ENT_QUOTES) ?>')">
+  <i class="material-symbols-rounded text-sm">delete</i>
+</button>
+<?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -257,8 +262,18 @@
             inicializarDataTable('#datatable-encomiendas', { ordering: false, placeholder: 'Buscar envío...' });
         }
 
-        var llegadasInicializada = false;
-
+        window.anularGuia = function (id, guia) {
+  Swal.fire({title:'¿Anular la guía #' + guia + '?', text:'Dejará de contar en caja y reportes. No se puede deshacer.', icon:'warning',
+    showCancelButton:true, confirmButtonText:'Sí, anular', cancelButtonText:'Cancelar', confirmButtonColor:'#f5365c'})
+  .then(function (r) {
+    if (!r.isConfirmed) return;
+    const fd = new FormData(); fd.append('id_encomienda', id);
+    fetch('<?= rtrim(URL, "/") ?>/encomiendas/anular', {method:'POST', body:fd}).then(x => x.json())
+      .then(res => res.success ? location.reload() : Swal.fire('No se pudo anular', res.message, 'error'))
+      .catch(() => Swal.fire('Error', 'Error en el servidor', 'error'));
+  });
+};
+var llegadasInicializada = false;
         // Escuchar el cambio de pestaña para inicializar lazy-loading del DataTable de llegadas
         $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
             var targetTab = $(e.target).attr('href');

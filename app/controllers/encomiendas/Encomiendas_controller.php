@@ -617,5 +617,24 @@ class Encomiendas_controller {
         require_once __DIR__ . '/../../views/dashboard/encomiendas/print_acta.php';
         exit;
     }
+
+    public function anular() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success' => false, 'message' => 'Método no permitido']); exit; }
+
+        $id = intval($_POST['id_encomienda'] ?? 0);
+        try {
+            if ($id <= 0 || !$this->encomiendasModel->anularEncomienda($id, (int)($_SESSION['id_sucursal'] ?? 0))) {
+                echo json_encode(['success' => false, 'message' => 'No se puede anular: la guía ya fue asignada a un turno, entregada o no es de su sucursal.']);
+                exit;
+            }
+            Flash::set(true, 'La guía fue anulada correctamente.', 'Guía Anulada');
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error en el servidor al anular la guía.']);
+        }
+        exit;
+    }
 }
 ?>

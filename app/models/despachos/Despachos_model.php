@@ -510,5 +510,51 @@ class Despachos_model {
             return '';
         }
     }
+
+    /** Cancela un turno abierto: anula boletos (libera asientos), devuelve guías a pendientes. */
+    public function cancelarTurno($id_turno, $id_sucursal) {
+        $this->pdo->beginTransaction();
+        try {
+            $st = $this->pdo->prepare("SELECT et.nombre_estado_turno FROM turnos t
+                INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+                WHERE t.id_turno = :t AND t.id_sucursal_origen = :o AND (t.estado_turno = 1 OR t.estado_turno IS NULL) FOR UPDATE");
+            $st->execute([':t' => $id_turno, ':o' => $id_sucursal]);
+            $f = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$f) throw new Exception('El turno no existe.');
+            if (!$this->esTurnoAbierto($f['nombre_estado_turno'])) throw new Exception('Solo se puede cancelar un turno abierto.');
+
+            $idE = $this->pdo->query("SELECT id_estado_turno FROM estados_turnos WHERE LOWER(nombre_estado_turno) = 'cancelado' LIMIT 1")->fetchColumn();
+            if (!$idE) {
+                $this->pdo->exec("INSERT INTO estados_turnos (nombre_estado_turno, estado_turno, create_estado_turno) VALUES ('Cancelado', 1, NOW())");
+                $idE = $this->pdo->lastInsertId();
+            }
+
+            $this->pdo->prepare("UPDATE encomiendas SET id_turno = NULL, id_estado_encomienda = 1, update_encomienda = NOW() WHERE id_turno = :t")
+                ->execute([':t' => $id_turno]);
+
+            $act = "(estado_detalle_pasaje = 1 OR estado_detalle_pasaje IS NULL)";
+            $st = $this->pdo->prepare("SELECT DISTINCT id_pasaje FROM detalles_pasajes WHERE id_turno = :t AND $act");
+            $st->execute([':t' => $id_turno]);
+            $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+
+            $this->pdo->prepare("UPDATE detalles_pasajes SET estado_detalle_pasaje = 0, id_elemento = NULL, update_detalle_pasaje = NOW()
+                WHERE id_turno = :t AND $act")->execute([':t' => $id_turno]);
+
+            $rec = $this->pdo->prepare("UPDATE pasajes SET
+                total_pasaje = (SELECT IFNULL(SUM(precio_detalle_pasaje),0) FROM detalles_pasajes WHERE id_pasaje = :a AND $act),
+                estado_pasaje = IF((SELECT COUNT(*) FROM detalles_pasajes WHERE id_pasaje = :b AND $act) = 0, 0, 1),
+                update_pasaje = NOW() WHERE id_pasaje = :c");
+            foreach ($ids as $idp) $rec->execute([':a' => $idp, ':b' => $idp, ':c' => $idp]);
+
+            $this->pdo->prepare("UPDATE turnos SET id_estado_turno = :e, update_turno = NOW() WHERE id_turno = :t")
+                ->execute([':e' => $idE, ':t' => $id_turno]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
+    }
 }
 ?>

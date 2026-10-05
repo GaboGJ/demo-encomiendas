@@ -519,5 +519,102 @@ class Reportes_model {
                          " . $this->movFrom() . " $cond AND $w
                          GROUP BY m.concepto_movimiento_caja ORDER BY monto DESC", $p);
     }
+
+    /** Datos reales del panel principal. $ids = sucursales permitidas. */
+    public function dashboard(array $ids, $idSindicato) {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        $d = ['kpi' => ['flete'=>0,'flete_ayer'=>0,'guias'=>0,'transito'=>0,'despachos'=>0,'cod'=>0,'cod_n'=>0],
+            'manifiestos'=>[], 'movs'=>[], 'semana'=>['labels'=>[],'data'=>[]], 'meses'=>['labels'=>[],'data'=>[]],
+            'efect'=>['labels'=>[],'data'=>[]], 'usuarios'=>[]];
+        if (!$ids) return $d;
+        $in  = implode(',', $ids);
+        $ok  = "(e.estado_encomienda = 1 OR e.estado_encomienda IS NULL)";
+        $ent = "(SELECT id_estado_encomienda FROM estados_encomiendas WHERE LOWER(nombre_estado_encomienda) = 'entregado')";
+        $tra = "(SELECT id_estado_encomienda FROM estados_encomiendas WHERE LOWER(nombre_estado_encomienda) IN ('enviado','despachado','en ruta','en transito'))";
+        $desp = "(SELECT id_estado_turno FROM estados_turnos WHERE LOWER(nombre_estado_turno) LIKE '%despachado%')";
+
+        try {
+            $k = $this->q("SELECT
+                (SELECT IFNULL(SUM(e.monto_encomienda),0) FROM encomiendas e WHERE e.id_sucursal_origen IN ($in) AND $ok AND DATE(e.create_encomienda) = CURDATE()) AS flete,
+                (SELECT IFNULL(SUM(e.monto_encomienda),0) FROM encomiendas e WHERE e.id_sucursal_origen IN ($in) AND $ok AND DATE(e.create_encomienda) = CURDATE() - INTERVAL 1 DAY) AS flete_ayer,
+                (SELECT COUNT(*) FROM encomiendas e WHERE e.id_sucursal_origen IN ($in) AND $ok AND DATE(e.create_encomienda) = CURDATE()) AS guias,
+                (SELECT COUNT(*) FROM encomiendas e WHERE e.id_sucursal_origen IN ($in) AND $ok AND e.id_estado_encomienda IN $tra) AS transito,
+                (SELECT COUNT(*) FROM turnos t WHERE t.id_sucursal_origen IN ($in) AND (t.estado_turno = 1 OR t.estado_turno IS NULL)
+                    AND t.fecha_salida_turno = CURDATE() AND t.id_estado_turno IN $desp) AS despachos,
+                (SELECT IFNULL(SUM(e.monto_encomienda),0) FROM encomiendas e WHERE e.id_sucursal_destino IN ($in) AND $ok
+                    AND CAST(e.estado_pago_encomienda AS UNSIGNED) = 0 AND e.id_estado_encomienda NOT IN $ent) AS cod,
+                (SELECT COUNT(*) FROM encomiendas e WHERE e.id_sucursal_destino IN ($in) AND $ok
+                    AND CAST(e.estado_pago_encomienda AS UNSIGNED) = 0 AND e.id_estado_encomienda NOT IN $ent) AS cod_n", [])[0];
+            $d['kpi'] = array_map('floatval', $k);
+
+            $d['manifiestos'] = $this->q("SELECT t.id_turno, v.numero_interno_vehiculo AS unidad,
+                    CONCAT(IFNULL(p.nombre_persona,''), ' ', IFNULL(p.apellido_paterno_persona,'')) AS chofer,
+                    so.ciudad_sucursal AS origen, sd.ciudad_sucursal AS destino, t.fecha_salida_turno, t.hora_salida_turno,
+                    (SELECT IFNULL(SUM(dp.precio_detalle_pasaje),0) FROM detalles_pasajes dp WHERE dp.id_turno = t.id_turno AND (dp.estado_detalle_pasaje = 1 OR dp.estado_detalle_pasaje IS NULL))
+                + (SELECT IFNULL(SUM(e.monto_encomienda),0) FROM encomiendas e WHERE e.id_turno = t.id_turno AND $ok) AS carga
+                FROM turnos t
+                INNER JOIN estados_turnos et ON t.id_estado_turno = et.id_estado_turno
+                INNER JOIN sucursales so ON t.id_sucursal_origen = so.id_sucursal
+                INNER JOIN sucursales sd ON t.id_sucursal_destino = sd.id_sucursal
+                LEFT JOIN vehiculos_choferes vc ON t.id_vehiculo_chofer = vc.id_vehiculo_chofer
+                LEFT JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                LEFT JOIN choferes ch ON vc.id_chofer = ch.id_chofer
+                LEFT JOIN personas p ON ch.id_persona = p.id_persona
+                WHERE t.id_sucursal_origen IN ($in) AND LOWER(et.nombre_estado_turno) LIKE '%despachado%'
+                AND (t.estado_turno = 1 OR t.estado_turno IS NULL)
+                ORDER BY t.id_turno DESC LIMIT 5", []);
+
+            // Últimos movimientos
+            $m = [];
+            foreach ($this->q("SELECT e.guia_encomienda g, e.create_encomienda f FROM encomiendas e WHERE e.id_sucursal_origen IN ($in) AND $ok ORDER BY e.id_encomienda DESC LIMIT 3", []) as $r)
+                $m[] = ['Guía #' . $r['g'] . ' registrada', 'inventory', 'success', $r['f']];
+            foreach (array_slice($d['manifiestos'], 0, 2) as $r)
+                $m[] = ['Despacho T-' . str_pad($r['id_turno'], 3, '0', STR_PAD_LEFT) . ' · Unidad ' . $r['unidad'], 'local_shipping', 'info', $r['fecha_salida_turno'] . ' ' . $r['hora_salida_turno']];
+            foreach ($this->q("SELECT e.guia_encomienda g, en.create_entrega_encomienda f FROM entregas_encomiendas en
+                    INNER JOIN encomiendas e ON en.id_encomienda = e.id_encomienda
+                    WHERE e.id_sucursal_destino IN ($in) AND en.delete_entrega_encomienda IS NULL ORDER BY en.id_entrega_encomienda DESC LIMIT 3", []) as $r)
+                $m[] = ['Guía #' . $r['g'] . ' entregada', 'check_circle', 'warning', $r['f']];
+            usort($m, function ($a, $b) { return strcmp($b[3], $a[3]); });
+            $d['movs'] = array_slice($m, 0, 6);
+
+            // Gráfica semanal (guías por día)
+            $map = array_column($this->q("SELECT DATE(e.create_encomienda) d, COUNT(*) n FROM encomiendas e
+                WHERE e.id_sucursal_origen IN ($in) AND $ok AND e.create_encomienda >= CURDATE() - INTERVAL 6 DAY GROUP BY d", []), 'n', 'd');
+            $dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+            for ($i = 6; $i >= 0; $i--) {
+                $t = strtotime("-$i day");
+                $d['semana']['labels'][] = $dias[date('w', $t)];
+                $d['semana']['data'][]   = (int)($map[date('Y-m-d', $t)] ?? 0);
+            }
+
+            // Fletes de los últimos 6 meses
+            $map = array_column($this->q("SELECT DATE_FORMAT(e.create_encomienda, '%Y-%m') ym, SUM(e.monto_encomienda) s FROM encomiendas e
+                WHERE e.id_sucursal_origen IN ($in) AND $ok AND e.create_encomienda >= DATE_FORMAT(CURDATE() - INTERVAL 5 MONTH, '%Y-%m-01') GROUP BY ym", []), 's', 'ym');
+            for ($i = 5; $i >= 0; $i--) {
+                $t = strtotime(date('Y-m-01') . " -$i month");
+                $d['meses']['labels'][] = mb_substr(ucfirst(ValidarReportes::nombreMes(date('n', $t))), 0, 3, 'UTF-8');
+                $d['meses']['data'][]   = round((float)($map[date('Y-m', $t)] ?? 0), 2);
+            }
+
+            // Efectividad de entrega por semana (últimas 4)
+            $rows = [];
+            foreach ($this->q("SELECT FLOOR(DATEDIFF(CURDATE(), DATE(e.create_encomienda)) / 7) w, COUNT(*) n, SUM(e.id_estado_encomienda IN $ent) en
+                FROM encomiendas e WHERE e.id_sucursal_destino IN ($in) AND $ok AND e.create_encomienda >= CURDATE() - INTERVAL 27 DAY GROUP BY w", []) as $r) $rows[(int)$r['w']] = $r;
+            for ($w = 3; $w >= 0; $w--) {
+                $r = $rows[$w] ?? null;
+                $d['efect']['labels'][] = 'Sem ' . (4 - $w);
+                $d['efect']['data'][]   = ($r && $r['n'] > 0) ? round($r['en'] * 100 / $r['n']) : 0;
+            }
+
+            $d['usuarios'] = $this->q("SELECT CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS nombre, r.nombre_rol,
+                    CAST(IFNULL(u.estado_usuario, 1) AS UNSIGNED) AS activo
+                FROM usuarios u INNER JOIN personas p ON u.id_persona = p.id_persona
+                INNER JOIN roles r ON u.id_rol = r.id_rol INNER JOIN sucursales s ON u.id_sucursal = s.id_sucursal
+                WHERE s.id_sindicato = :s AND u.delete_usuario IS NULL ORDER BY u.id_usuario DESC LIMIT 5", [':s' => (int)$idSindicato]);
+        } catch (PDOException $e) {
+            error_log('Reportes_model::dashboard: ' . $e->getMessage());
+        }
+        return $d;
+    }
 }
 ?>

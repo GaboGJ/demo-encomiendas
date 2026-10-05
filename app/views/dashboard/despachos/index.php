@@ -1,3 +1,16 @@
+<script>
+function cancelarTurno(id) {
+  Swal.fire({title:'¿Cancelar el turno?', text:'Se anularán los boletos (asientos libres) y las guías volverán a pendientes.', icon:'warning',
+    showCancelButton:true, confirmButtonText:'Sí, cancelar', cancelButtonText:'Volver', confirmButtonColor:'#f5365c'})
+  .then(function (r) {
+    if (!r.isConfirmed) return;
+    const fd = new FormData(); fd.append('id_turno', id);
+    fetch('<?= rtrim(URL, '/') ?>/despachos/cancelar', {method:'POST', body:fd}).then(x => x.json())
+      .then(res => res.success ? location.reload() : Swal.fire('No se pudo cancelar', res.message, 'error'))
+      .catch(() => Swal.fire('Error', 'Error en el servidor', 'error'));
+  });
+}
+</script>
 <!-- TABLA PRINCIPAL DE DESPACHOS Y TURNOS -->
 <div class="container-fluid py-3 flex-grow-1">
   <div class="row">
@@ -108,11 +121,9 @@
     <?php endif; ?>
   
 
-                          <a href="javascript:;" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Ver Manifiesto">
-                            <i class="material-symbols-rounded text-sm">visibility</i>
-                          </a>
+                          <a href="javascript:;" onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Ver Manifiesto">
                           
-                          <a href="javascript:;" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Cancelar Turno">
+                          <a href="javascript:;" onclick="cancelarTurno(<?= (int)$d['id_turno'] ?>)" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Cancelar Turno">
                             <i class="material-symbols-rounded text-sm">block</i>
                           </a>
                         </div>

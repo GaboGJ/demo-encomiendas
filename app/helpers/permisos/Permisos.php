@@ -48,7 +48,7 @@ class Permisos {
         'guardarchoferes' => 'editar', 'configurar' => 'editar', 'guardarconfiguracion' => 'editar',
         'permisos' => 'editar', 'guardarpermisos' => 'editar', 'restaurar' => 'editar', 'store' => 'crear',
         // Eliminar
-        'eliminar' => 'eliminar', 'anular' => 'eliminar', 'anulardetalle' => 'eliminar',
+        'eliminar' => 'eliminar', 'anular' => 'eliminar', 'cancelar' => 'eliminar',
         // Ver
         'index' => 'ver', 'papelera' => 'ver', 'detalle' => 'ver',
     ];
