@@ -25,12 +25,13 @@
                     <h6 class="text-xs font-weight-bolder text-uppercase mb-0 text-dark">Datos Personales</h6>
                   </div>
                   <div class="row g-2">
-                    <div class="col-12 col-sm-6">
-                      <div class="input-group input-group-outline is-filled my-2">
-                        <label class="form-label">Nº Carnet (C.I.)</label>
-                        <input type="text" class="form-control bg-gray-100" value="<?= $h($usuario['carnet_persona']) ?>" readonly>
-                      </div>
-                    </div>
+                   <div class="col-12 col-sm-6">
+  <div class="input-group input-group-outline is-filled my-2">
+    <label class="form-label">Nº Carnet (C.I.) *</label>
+    <input type="text" class="form-control text-uppercase" name="ci" id="ci" maxlength="20"
+           value="<?= $h($usuario['carnet_persona']) ?>" required>
+  </div>
+</div>
                     <div class="col-12 col-sm-6">
                       <div class="input-group input-group-outline is-filled my-2">
                         <label class="form-label">Celular *</label>
@@ -134,6 +135,10 @@
 <script>
 (function () {
   const baseUrl = '<?= rtrim(URL, "/") ?>';
+  
+  document.getElementById('ci').addEventListener('input', function () {
+    this.value = this.value.toUpperCase().replace(/\s+/g, '');
+  });
 
   document.getElementById('btnActualizarUsuario').addEventListener('click', function () {
     const form = document.getElementById('formUsuario');

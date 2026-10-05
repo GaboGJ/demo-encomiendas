@@ -191,5 +191,11 @@ class Usuarios_model {
             return false;
         }
     }
-}
+    
+    /** Cambia el C.I. de la persona (el controlador valida duplicados antes). */
+    public function actualizarCarnet($id_persona, $ci) {
+        $st = $this->pdo->prepare("UPDATE personas SET carnet_persona = :ci, update_persona = NOW() WHERE id_persona = :id");
+        return $st->execute([':ci' => $ci, ':id' => $id_persona]);
+    }
+    }
 ?>

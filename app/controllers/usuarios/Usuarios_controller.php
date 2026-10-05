@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../models/usuarios/Usuarios_model.php';
 require_once __DIR__ . '/../../models/personas/Personas_model.php';
+require_once __DIR__ . '/../../helpers/auth/ValidarPersona.php';
 
 class Usuarios_controller {
     private $usuariosModel;
@@ -187,12 +188,13 @@ class Usuarios_controller {
                 $this->json(['success' => false, 'message' => 'Método no permitido']);
             }
 
-            $idUsuario  = intval($_POST['id_usuario'] ?? 0);
-            $usuario    = $idUsuario > 0 ? $this->usuariosModel->obtenerUsuario($idUsuario) : null;
+            $idUsuario = intval($_POST['id_usuario'] ?? 0);
+            $usuario   = $idUsuario > 0 ? $this->usuariosModel->obtenerUsuario($idUsuario) : null;
             if (!$usuario) {
                 $this->json(['success' => false, 'message' => 'El usuario no existe o fue eliminado.']);
             }
 
+            $ci        = ValidarPersona::normalizarCi($_POST['ci'] ?? $usuario['carnet_persona']);
             $nombres   = trim($_POST['nombres'] ?? '');
             $paterno   = trim($_POST['paterno'] ?? '');
             $materno   = trim($_POST['materno'] ?? '');
@@ -203,8 +205,10 @@ class Usuarios_controller {
             $password  = (string)($_POST['password'] ?? '');
             $password2 = (string)($_POST['password_confirm'] ?? '');
 
-            if ($nombres === '' || $paterno === '' || $celular === '') {
-                $this->json(['success' => false, 'message' => 'Nombres, apellido paterno y celular son obligatorios.']);
+            // Valida C.I. (mismo formato que el login), nombres y celular
+            $error = ValidarPersona::validar($ci, $nombres, $paterno, $materno, $celular);
+            if ($error !== null) {
+                $this->json(['success' => false, 'message' => $error]);
             }
             if ($idRol <= 0 || $idSucursal <= 0) {
                 $this->json(['success' => false, 'message' => 'Seleccione el rol y la sucursal.']);
@@ -222,18 +226,22 @@ class Usuarios_controller {
             $pdo->beginTransaction();
 
             try {
+                // C.I. modificado: no puede pertenecer a OTRA persona
+                if (strcasecmp($ci, (string)$usuario['carnet_persona']) !== 0) {
+                    $otra = $this->personasModel->buscarPorCi($ci);
+                    if ($otra && (int)$otra['id_persona'] !== (int)$usuario['id_persona']) {
+                        throw new Exception('Ya existe otra persona registrada con ese C.I.');
+                    }
+                    $this->usuariosModel->actualizarCarnet($usuario['id_persona'], $ci);
+                }
+
                 $this->usuariosModel->actualizarPersona($usuario['id_persona'], [
-                    'nombres'   => $nombres,
-                    'paterno'   => $paterno,
-                    'materno'   => $materno,
-                    'celular'   => $celular,
-                    'direccion' => $direccion
+                    'nombres' => $nombres, 'paterno' => $paterno, 'materno' => $materno,
+                    'celular' => $celular, 'direccion' => $direccion
                 ]);
 
                 $this->usuariosModel->actualizarUsuario($idUsuario, [
-                    'id_rol'      => $idRol,
-                    'id_sucursal' => $idSucursal,
-                    'password'    => $password
+                    'id_rol' => $idRol, 'id_sucursal' => $idSucursal, 'password' => $password
                 ]);
 
                 $pdo->commit();
@@ -245,6 +253,12 @@ class Usuarios_controller {
             Flash::set(true, 'Los datos del usuario fueron actualizados correctamente.', 'Usuario Actualizado');
             $this->json(['success' => true]);
 
+        } catch (PDOException $e) {
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+                $this->json(['success' => false, 'message' => 'Ya existe otra persona registrada con ese C.I.']);
+            }
+            error_log('Usuarios actualizar: ' . $e->getMessage());
+            $this->json(['success' => false, 'message' => 'Error de base de datos al actualizar.']);
         } catch (Exception $e) {
             $this->json(['success' => false, 'message' => $e->getMessage()]);
         }

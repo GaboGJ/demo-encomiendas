@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../models/encomiendas/Encomiendas_model.php';
 require_once __DIR__ . '/../../models/personas/Personas_model.php';
 require_once __DIR__ . '/../../models/sucursales/Sucursales_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
+require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
 // Flash ya está disponible globalmente: se incluye una sola vez desde config/config.php
 
 class Encomiendas_controller {
@@ -10,12 +11,14 @@ class Encomiendas_controller {
     private $personasModel;
     private $sucursalesModel;
     private $metodosPagosModel;
+    private $cajasModel;
 
     public function __construct() {
         $this->encomiendasModel = new Encomiendas_model();
         $this->personasModel    = new Personas_model();
         $this->sucursalesModel  = new Sucursales_model();
         $this->metodosPagosModel = new Metodos_pagos_model();
+        $this->cajasModel = new Cajas_model();
     }
 
     public function index() {
@@ -133,6 +136,12 @@ class Encomiendas_controller {
 
             $id_sucursal_origen = $_SESSION['id_sucursal'] ?? 1;
             $id_usuario         = $_SESSION['id_usuario'] ?? 1;
+                        
+            $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario);
+            if ($id_historial_caja <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Debe aperturar una caja antes de emitir guías (módulo Control de Cajas).']);
+                exit;
+            }
 
             $ciRemitente = trim($_POST['remitente_ci'] ?? '');
             if (empty($ciRemitente)) {
@@ -184,6 +193,7 @@ class Encomiendas_controller {
                 'monto_encomienda'       => floatval($_POST['monto_total'] ?? 0),
                 'estado_pago_encomienda' => isset($_POST['modalidad_pago']) ? intval($_POST['modalidad_pago']) : 1,
                 'id_metodo_pago'         => intval($_POST['metodo_cobro'] ?? 1),
+                'id_historial_caja'      => $id_historial_caja,
                 'id_usuario'             => $id_usuario
             ];
 
@@ -296,6 +306,7 @@ class Encomiendas_controller {
 
             $id_sucursal_destino = $_SESSION['id_sucursal'] ?? 1; // Destino es la sucursal actual
             $id_usuario          = $_SESSION['id_usuario'] ?? 1;
+            $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario) ?: null;
 
             $guiaManual = trim($_POST['guia_encomienda'] ?? '');
             if (empty($guiaManual)) {
@@ -360,7 +371,8 @@ class Encomiendas_controller {
                 'monto_encomienda'       => floatval($_POST['monto_encomienda'] ?? 0),
                 'estado_pago_encomienda' => $estadoPago,
                 'id_metodo_pago'         => $idMetodoPago,
-                'id_usuario'             => $id_usuario
+                'id_usuario'             => $id_usuario,
+                'id_historial_caja'      => $id_historial_caja
             ];
 
             // La recepción no maneja tarifa (la sucursal externa no usa este sistema,
@@ -467,6 +479,12 @@ class Encomiendas_controller {
             $idMetodoPago  = intval($_POST['id_metodo_pago'] ?? 1);
             $id_usuario    = $_SESSION['id_usuario'] ?? 1;
 
+            $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario);
+            if ($id_historial_caja <= 0 && $montoEntrega > 0) {
+                echo json_encode(['success' => false, 'message' => 'Debe aperturar una caja para cobrar esta encomienda contra entrega (módulo Control de Cajas).']);
+                exit;
+            }
+
             if ($id_encomienda <= 0 || empty($ciReceptor)) {
                 echo json_encode(['success' => false, 'message' => 'Datos insuficientes para registrar la entrega.']);
                 exit;
@@ -499,6 +517,7 @@ class Encomiendas_controller {
             $dataEntrega = [
                 'id_encomienda'             => $id_encomienda,
                 'id_persona_retiro'         => $id_persona_retiro,
+                'id_historial_caja'         => $id_historial_caja,
                 'id_usuario'                => $id_usuario,
                 'monto_entrega_encomienda'  => $montoEntrega,
                 'id_metodo_pago'            => $idMetodoPago,

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../models/personas/Personas_model.php';
 require_once __DIR__ . '/../../models/despachos/Despachos_model.php';
 require_once __DIR__ . '/../../models/elementos/Elementos_model.php';
 require_once __DIR__ . '/../../models/metodos_pagos/Metodos_pagos_model.php';
+require_once __DIR__ . '/../../models/cajas/Cajas_model.php';
 
 class Pasajes_controller {
 
@@ -22,6 +23,7 @@ class Pasajes_controller {
     private $despachosModel;
     private $elementosModel;
     private $metodosPagosModel;
+    private $cajasModel;
 
     public function __construct() {
         $this->pasajesModel      = new Pasajes_model();
@@ -29,6 +31,7 @@ class Pasajes_controller {
         $this->despachosModel    = new Despachos_model();
         $this->elementosModel    = new Elementos_model();
         $this->metodosPagosModel = new Metodos_pagos_model();
+        $this->cajasModel        = new Cajas_model();
     }
 
     /**
@@ -273,6 +276,11 @@ class Pasajes_controller {
             if (!$id_turno && !self::PERMITIR_VENTA_EN_ESPERA) {
                 throw new Exception('Debe seleccionar un turno para emitir el boleto.');
             }
+                        
+            $id_historial_caja = $this->cajasModel->idHistorialAbiertoDeUsuario($id_usuario);
+            if ($id_historial_caja <= 0) {
+                throw new Exception('Debe aperturar una caja antes de vender pasajes (módulo Control de Cajas).');
+            }
 
             $pdo->beginTransaction();
 
@@ -304,6 +312,7 @@ class Pasajes_controller {
 
                 $resPasaje = $this->pasajesModel->insertarPasaje([
                     'id_persona_comprador' => $id_comprador,
+                    'id_historial_caja'    => $id_historial_caja,
                     'id_usuario'           => $id_usuario,
                     'id_metodo_pago'       => $id_metodo_pago,
                     'total_pasaje'         => $totalPasaje

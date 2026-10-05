@@ -149,9 +149,9 @@ class Encomiendas_model {
         $guia = $this->generarGuiaCorrelativa();
 
         $sql = "INSERT INTO encomiendas 
-            (guia_encomienda, id_sucursal_origen, id_sucursal_destino, id_persona_remitente, id_persona_destinatario, id_turno, id_usuario, declaracion_encomienda, monto_encomienda, estado_pago_encomienda, id_metodo_pago, id_estado_encomienda, estado_encomienda, create_encomienda) 
+            (guia_encomienda, id_sucursal_origen, id_sucursal_destino, id_persona_remitente, id_persona_destinatario, id_turno, id_historial_caja, id_usuario, declaracion_encomienda, monto_encomienda, estado_pago_encomienda, id_metodo_pago, id_estado_encomienda, estado_encomienda, create_encomienda) 
             VALUES 
-            (:guia, :origen, :destino, :remitente, :destinatario, :turno, :usuario, :declaracion, :monto, :estado_pago, :metodo_pago, 1, 1, NOW())";
+            (:guia, :origen, :destino, :remitente, :destinatario, :turno, :historial, :usuario, :declaracion, :monto, :estado_pago, :metodo_pago, 1, 1, NOW())";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':guia', $guia);
@@ -260,9 +260,9 @@ class Encomiendas_model {
      */
     public function insertarRecepcionEncomienda($data) {
         $sql = "INSERT INTO encomiendas 
-            (guia_encomienda, id_sucursal_origen, id_sucursal_destino, id_persona_remitente, id_persona_destinatario, id_turno, id_usuario, declaracion_encomienda, monto_encomienda, estado_pago_encomienda, id_metodo_pago, id_estado_encomienda, estado_encomienda, create_encomienda) 
+            (guia_encomienda, id_sucursal_origen, id_sucursal_destino, id_persona_remitente, id_persona_destinatario, id_turno, id_historial_caja, id_usuario, declaracion_encomienda, monto_encomienda, estado_pago_encomienda, id_metodo_pago, id_estado_encomienda, estado_encomienda, create_encomienda) 
             VALUES 
-            (:guia, :origen, :destino, :remitente, :destinatario, :turno, :usuario, :declaracion, :monto, :estado_pago, :metodo_pago, 1, 1, NOW())";
+            (:guia, :origen, :destino, :remitente, :destinatario, :turno, :historial, :usuario, :declaracion, :monto, :estado_pago, :metodo_pago, 1, 1, NOW())";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':guia', $data['guia_encomienda']);
@@ -271,6 +271,7 @@ class Encomiendas_model {
         $stmt->bindValue(':remitente', $data['id_persona_remitente']);
         $stmt->bindValue(':destinatario', $data['id_persona_destinatario']);
         $stmt->bindValue(':turno', $data['id_turno'] ?? null);
+        $stmt->bindValue(':historial', $data['id_historial_caja'] ?? null);
         $stmt->bindValue(':usuario', $data['id_usuario']);
         $stmt->bindValue(':declaracion', $data['declaracion_encomienda']);
         $stmt->bindValue(':monto', $data['monto_encomienda']);
@@ -287,14 +288,15 @@ class Encomiendas_model {
 
     public function registrarEntrega($data) {
         $sql = "INSERT INTO entregas_encomiendas 
-                (id_encomienda, id_persona_retiro, id_usuario, monto_entrega_encomienda, id_metodo_pago, observacion_entrega_encomienda, create_entrega_encomienda) 
+                (id_encomienda, id_persona_retiro, id_historial_caja, id_usuario, monto_entrega_encomienda, id_metodo_pago, observacion_entrega_encomienda, create_entrega_encomienda) 
                 VALUES 
-                (:id_encomienda, :id_persona_retiro, :id_usuario, :monto, :id_metodo_pago, :observacion, NOW())";
+                (:id_encomienda, :id_persona_retiro, :historial, :id_usuario, :monto, :id_metodo_pago, :observacion, NOW())";
 
         $stmt = $this->pdo->prepare($sql);
         return $stmt->execute([
             ':id_encomienda'       => $data['id_encomienda'],
             ':id_persona_retiro'   => $data['id_persona_retiro'],
+            ':historial'           => $data['id_historial_caja'] ?? null,
             ':id_usuario'          => $data['id_usuario'],
             ':monto'               => $data['monto_entrega_encomienda'],
             ':id_metodo_pago'      => $data['id_metodo_pago'],

@@ -98,18 +98,19 @@ class Pasajes_model {
      * Inserta la cabecera de la venta de pasaje.
      * pasajes.id_persona_comprador = quien PAGA la venta.
      */
-    public function insertarPasaje($data) {
+     public function insertarPasaje($data) {
         $codigo = $this->generarCodigoCorrelativo();
 
         $sql = "INSERT INTO pasajes 
-            (codigo_pasaje, id_persona_comprador, id_usuario, id_metodo_pago, total_pasaje, estado_pasaje, create_pasaje) 
+            (codigo_pasaje, id_persona_comprador, id_historial_caja, id_usuario, id_metodo_pago, total_pasaje, estado_pasaje, create_pasaje) 
             VALUES 
-            (:codigo, :comprador, :usuario, :metodo_pago, :total, 1, NOW())";
+            (:codigo, :comprador, :historial, :usuario, :metodo_pago, :total, 1, NOW())";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':codigo'      => $codigo,
             ':comprador'   => $data['id_persona_comprador'],
+            ':historial'   => $data['id_historial_caja'],
             ':usuario'     => $data['id_usuario'],
             ':metodo_pago' => $data['id_metodo_pago'],
             ':total'       => $data['total_pasaje']
