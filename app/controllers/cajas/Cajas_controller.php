@@ -28,7 +28,7 @@ class Cajas_controller {
             'totalPapelera'    => $this->cajasModel->contarEliminadas($this->idSindicato(), $this->idSucursal()),
             'idSucursalActual' => $this->idSucursal(),
             'idUsuarioActual'  => $this->idUsuario(),
-            'esPrincipal'      => (int)($_SESSION['es_principal'] ?? 0) === 1,
+            'esPrincipal'      => $this->esAdmin(),
         ]);
     }
 
@@ -89,10 +89,7 @@ class Cajas_controller {
         $this->acceso(true);
 
         $id = intval($_GET['id'] ?? 0);
-        $turno = $id > 0 ? $this->turno($id) : null;
-        if (!$turno) {
-            $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
-        }
+        $turno = $this->turnoPropio($id);
 
         $this->json([
             'success' => true,
@@ -303,10 +300,7 @@ class Cajas_controller {
         $this->acceso(true);
 
         $idH = intval($_GET['id'] ?? 0);
-        $turno = $idH > 0 ? $this->turno($idH) : null;
-        if (!$turno) {
-            $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
-        }
+        $turno = $this->turnoPropio($idH);
 
         $this->json([
             'success'     => true,
@@ -376,6 +370,11 @@ class Cajas_controller {
     private function idSucursal()  { return (int)($_SESSION['id_sucursal'] ?? 0); }
     private function idUsuario()   { return (int)($_SESSION['id_usuario'] ?? 0); }
 
+    /** Administrador = rol protegido del sistema (no solo sindicato principal). */
+    private function esAdmin() {
+        return mb_strtolower((string)($_SESSION['nombre_rol'] ?? ''), 'UTF-8') === Permisos::PROTEGIDO;
+    }
+
     /** Caja del sindicato Y de la sucursal del usuario. */
     private function caja($id, $incluirEliminadas = false) {
         return $this->cajasModel->obtenerCaja($id, $this->idSindicato(), $incluirEliminadas, $this->idSucursal());
@@ -393,7 +392,7 @@ class Cajas_controller {
         if (!$t) {
             $this->json(['success' => false, 'message' => 'El turno de caja no existe.']);
         }
-        if ((int)$t['id_usuario'] !== $this->idUsuario() && (int)($_SESSION['es_principal'] ?? 0) !== 1) {
+        if ((int)$t['id_usuario'] !== $this->idUsuario() && !$this->esAdmin()) {
             $this->json(['success' => false, 'message' => 'Solo el cajero que abrió la caja (o el administrador) puede operarla.']);
         }
         return $t;
