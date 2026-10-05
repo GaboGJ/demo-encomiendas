@@ -373,6 +373,8 @@ function actualizarIndicadoresWizardEntrega() {
 function procesarGuardadoEntrega() {
   const baseUrl = '<?= rtrim(URL, "/") ?>';
   const btnSave = document.getElementById('btnSaveEntrega');
+  if (btnSave.disabled) return;
+  btnSave.disabled = true;
 
   const payload = {
     id_encomienda: $('#id_encomienda').val(),
@@ -385,7 +387,7 @@ function procesarGuardadoEntrega() {
     id_metodo_pago: $('#selectMetodoCobroDestino').val() || 1
   };
 
-  if (btnSave) btnSave.disabled = true;
+  //if (btnSave) btnSave.disabled = true;
 
   $.post(baseUrl + '/encomiendas/guardarEntrega', payload, function(res) {
     if (res.success) {

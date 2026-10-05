@@ -545,6 +545,7 @@ class Encomiendas_controller {
                 exit;
             }
 
+
             $personaReceptor = $this->personasModel->buscarPorCi($ciReceptor);
             if ($personaReceptor) {
                 $id_persona_retiro = $personaReceptor['id_persona'];

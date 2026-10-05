@@ -12,6 +12,7 @@ class Encomiendas_model {
             $sql = "SELECT 
                         e.id_encomienda,
                         e.guia_encomienda,
+                        e.id_turno,
                         e.monto_encomienda,
                         CAST(e.estado_pago_encomienda AS UNSIGNED) AS estado_pago_encomienda,
                         ee.nombre_estado_encomienda,
@@ -41,6 +42,7 @@ class Encomiendas_model {
             $sql = "SELECT 
                         e.id_encomienda,
                         e.guia_encomienda,
+                        e.id_turno,
                         e.monto_encomienda,
                         CAST(e.estado_pago_encomienda AS UNSIGNED) AS estado_pago_encomienda,
                         ee.nombre_estado_encomienda,
@@ -342,7 +344,7 @@ class Encomiendas_model {
                     LEFT JOIN personas p ON ee.id_persona_retiro = p.id_persona
                     LEFT JOIN metodos_pagos mp ON ee.id_metodo_pago = mp.id_metodo_pago
                     WHERE ee.id_encomienda = :id
-                    ORDER BY ee.id_entrega_encomienda DESCT
+                    ORDER BY ee.id_entrega_encomienda DESC
                     LIMIT 1";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([':id' => $id_encomienda]);

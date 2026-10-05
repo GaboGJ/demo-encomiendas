@@ -332,5 +332,21 @@ class Pasajes_model {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':id_a' => $id_pasaje, ':id_b' => $id_pasaje, ':id_c' => $id_pasaje]);
     }
+
+    public function pasajePerteneceASucursal($id_pasaje, $id_sucursal) {
+        $st = $this->pdo->prepare("SELECT COUNT(*) FROM pasajes p
+            INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+            WHERE p.id_pasaje = :p AND u.id_sucursal = :s");
+        $st->execute([':p' => $id_pasaje, ':s' => $id_sucursal]);
+        return (int)$st->fetchColumn() > 0;
+    }
+    public function detallePerteneceASucursal($id_detalle, $id_sucursal) {
+        $st = $this->pdo->prepare("SELECT COUNT(*) FROM detalles_pasajes dp
+            INNER JOIN pasajes p ON dp.id_pasaje = p.id_pasaje
+            INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+            WHERE dp.id_detalle_pasaje = :d AND u.id_sucursal = :s");
+        $st->execute([':d' => $id_detalle, ':s' => $id_sucursal]);
+        return (int)$st->fetchColumn() > 0;
+    }
 }
 ?>

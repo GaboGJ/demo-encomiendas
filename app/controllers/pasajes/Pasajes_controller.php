@@ -98,6 +98,13 @@ class Pasajes_controller {
             exit;
         }
 
+        $id_sucursal_actual = (int)($_SESSION['id_sucursal'] ?? 0);
+        if ((int)$turno['id_sucursal_origen'] !== $id_sucursal_actual
+            || !$this->despachosModel->esTurnoAbierto($turno['nombre_estado_turno'])) {
+            echo json_encode(['success' => false, 'message' => 'El turno no pertenece a su sucursal o ya no está abierto.']);
+            exit;
+        }
+
         $pisos     = $this->elementosModel->getPisosPorModelo($turno['id_modelo']);
         $elementos = $this->elementosModel->getElementosPorModelo($turno['id_modelo'], $id_turno);
 
@@ -299,6 +306,11 @@ class Pasajes_controller {
                 $turnoInfo = $this->despachosModel->obtenerTurnoConVehiculo($id_turno);
                 if (!$turnoInfo) {
                     throw new Exception('El turno seleccionado ya no está disponible.');
+                }
+
+                if ((int)$turnoInfo['id_sucursal_origen'] !== (int)($_SESSION['id_sucursal'] ?? 0)
+                    || !$this->despachosModel->esTurnoAbierto($turnoInfo['nombre_estado_turno'])) {
+                    throw new Exception('El turno no pertenece a su sucursal o ya fue despachado/cancelado.');
                 }
 
                 $pasajeros = $this->normalizarAsientos(

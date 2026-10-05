@@ -107,25 +107,33 @@ function cancelarTurno(id) {
                       </td>
                       <td class="align-middle text-end py-3 pe-5 ps-4">
                         <div class="d-flex align-items-center justify-content-end gap-1">
-    <?php if ($esDespachado): ?>
-      <!-- Ya despachado: solo imprimir la hoja de ruta -->
-      <button type="button" class="btn btn-link text-dark p-2 mb-0" title="Imprimir Hoja de Ruta"
-              onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)">
-        <i class="material-symbols-rounded text-sm">print</i>
-      </button>
-    <?php elseif ($esEnTurno): ?>
-      <!-- Aún no despachado: solo asignar pasajes y encomiendas -->
-      <a href="<?= URL ?>/despachos/asign?id=<?= (int)$d['id_turno'] ?>" class="btn btn-link text-success p-2 mb-0" data-bs-toggle="tooltip" title="Asignar Pasajes y Encomiendas">
+
+    <?php if ($esEnTurno): ?>
+      <!-- Si está en turno: Asignar pasajes/encomiendas y Cancelar turno -->
+      <a href="<?= URL ?>/despachos/asignar?id=<?= (int)$d['id_turno'] ?>" 
+         class="btn btn-link text-success p-2 mb-0" 
+         data-bs-toggle="tooltip" 
+         title="Asignar Pasajes y Encomiendas">
         <i class="material-symbols-rounded text-sm">assignment</i>
       </a>
-    <?php endif; ?>
-  
 
-                          <a href="javascript:;" onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)" class="btn btn-link text-dark p-2 mb-0" data-bs-toggle="tooltip" title="Ver Manifiesto">
-                          
-                          <a href="javascript:;" onclick="cancelarTurno(<?= (int)$d['id_turno'] ?>)" class="btn btn-link text-danger p-2 mb-0" data-bs-toggle="tooltip" title="Cancelar Turno">
-                            <i class="material-symbols-rounded text-sm">block</i>
-                          </a>
+      <a href="javascript:;" 
+         onclick="cancelarTurno(<?= (int)$d['id_turno'] ?>)" 
+         class="btn btn-link text-danger p-2 mb-0" 
+         data-bs-toggle="tooltip" 
+         title="Cancelar Turno">
+        <i class="material-symbols-rounded text-sm">block</i>
+      </a>
+    <?php elseif ($esDespachado): ?>
+      <!-- Si ya está despachado: Solo imprimir hoja de ruta/manifiesto -->
+      <button type="button" 
+              onclick="imprimirManifiestoDespacho(<?= (int)$d['id_turno'] ?>)" 
+              class="btn btn-link text-dark p-2 mb-0" 
+              data-bs-toggle="tooltip" 
+              title="Imprimir Hoja de Ruta">
+        <i class="material-symbols-rounded text-sm">print</i>
+      </button>
+    <?php endif; ?>
                         </div>
                       </td>
                     </tr>

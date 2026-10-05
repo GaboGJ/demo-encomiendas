@@ -136,7 +136,7 @@ class Despachos_controller {
             'monto_encomiendas'=> array_sum(array_column($encAsignadas, 'monto_encomienda')),
             'capacidad'        => intval($turno['total_asientos_modelo'] ?? 0),
         ];
-        $pasoInicial = min(4, max(1, intval($_GET['paso'] ?? 1)));
+        $pasoInicial = min(3, max(1, intval($_GET['paso'] ?? 1)));
 
         $viewPath = __DIR__ . '/../../views/dashboard/';
         $menuActivo = 'despachos';
