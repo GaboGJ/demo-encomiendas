@@ -18,9 +18,9 @@
         </a>
       </li>
 
-      <!-- GESTIÓN OPERATIVA -->
+      <!-- OPERACIONES Y VENTAS -->
       <li class="nav-item mt-3">
-        <h6 class="ps-4 ms-2 text-uppercase text-xs text-dark font-weight-bolder opacity-5">Gestión Operativa</h6>
+        <h6 class="ps-4 ms-2 text-uppercase text-xs text-dark font-weight-bolder opacity-5">Ventas y Operaciones</h6>
       </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'encomiendas') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/encomiendas">
@@ -37,16 +37,26 @@
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'despachos') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/despachos">
           <i class="material-symbols-rounded opacity-5">departure_board</i>
-          <span class="nav-link-text ms-1">Despachos</span>
+          <span class="nav-link-text ms-1">Despachos / Turnos</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'cajas') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/cajas">
           <i class="material-symbols-rounded opacity-5">payments</i>
-          <span class="nav-link-text ms-1">Cajas</span>
+          <span class="nav-link-text ms-1">Control de Cajas</span>
         </a>
       </li>
-     
+
+      <!-- FLOTA Y RUTAS -->
+      <li class="nav-item mt-3">
+        <h6 class="ps-4 ms-2 text-uppercase text-xs text-dark font-weight-bolder opacity-5">Gestión de Flota</h6>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'moviles') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/moviles">
+          <i class="material-symbols-rounded opacity-5">directions_bus</i>
+          <span class="nav-link-text ms-1">Vehículos (Móviles)</span>
+        </a>
+      </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'socios') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/socios">
           <i class="material-symbols-rounded opacity-5">handshake</i>
@@ -59,45 +69,33 @@
           <span class="nav-link-text ms-1">Choferes</span>
         </a>
       </li>
-       <li class="nav-item">
-        <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'moviles') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/moviles">
-          <i class="material-symbols-rounded opacity-5">directions_bus</i>
-          <span class="nav-link-text ms-1">Móviles</span>
-        </a>
-      </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'rutas') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/rutas">
           <i class="material-symbols-rounded opacity-5">alt_route</i>
-          <span class="nav-link-text ms-1">Rutas</span>
+          <span class="nav-link-text ms-1">Rutas y Destinos</span>
         </a>
       </li>
 
-      <!-- CONFIGURACIÓN E INSTITUCIONAL -->
+      <!-- ADMINISTRACIÓN DEL SISTEMA -->
       <li class="nav-item mt-3">
         <h6 class="ps-4 ms-2 text-uppercase text-xs text-dark font-weight-bolder opacity-5">Administración</h6>
       </li>
       <li class="nav-item">
-        <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'empresa') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/empresa">
-          <i class="material-symbols-rounded opacity-5">apartment</i>
-          <span class="nav-link-text ms-1">Empresa</span>
-        </a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'sindicatos') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/sindicatos">
           <i class="material-symbols-rounded opacity-5">domain</i>
-          <span class="nav-link-text ms-1">Sindicatos Asociados</span>
+          <span class="nav-link-text ms-1">Sindicatos</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'modelos') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/modelos">
           <i class="material-symbols-rounded opacity-5">car_rental</i>
-          <span class="nav-link-text ms-1">Modelos de Vehículos</span>
+          <span class="nav-link-text ms-1">Modelos de Bus</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link <?= (isset($menuActivo) && $menuActivo == 'usuarios') ? 'active bg-gradient-success text-white' : 'text-dark'; ?>" href="<?= URL; ?>/usuarios">
           <i class="material-symbols-rounded opacity-5">group</i>
-          <span class="nav-link-text ms-1">Gestión de Usuarios</span>
+          <span class="nav-link-text ms-1">Usuarios</span>
         </a>
       </li>
       <li class="nav-item">
@@ -107,7 +105,7 @@
         </a>
       </li>
 
-      <!-- REPORTES -->
+      <!-- REPORTES Y ANALÍTICA -->
       <li class="nav-item mt-3">
         <h6 class="ps-4 ms-2 text-uppercase text-xs text-dark font-weight-bolder opacity-5">Reportes</h6>
       </li>
