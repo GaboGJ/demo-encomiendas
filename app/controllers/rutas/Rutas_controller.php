@@ -107,6 +107,27 @@ class Rutas_controller {
             $this->errorBd($e, 'guardar');
         }
     }
+        /** AJAX POST: id_sindicato + nombre -> crea (o reutiliza) un destino del sindicato. */
+    public function crearDestino() {
+        $this->acceso(true);
+        $this->soloPost();
+
+        $idSind = $this->esPrincipal() ? intval($_POST['id_sindicato'] ?? 0) : $this->idSindicato();
+        $nombre = trim(preg_replace('/\s+/u', ' ', (string)($_POST['nombre'] ?? '')));
+
+        if (mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') > 50 || !preg_match('/^[\p{L}][\p{L}\s\'.\-]*$/u', $nombre)) {
+            $this->json(['success' => false, 'message' => 'El nombre del destino debe tener de 2 a 50 caracteres (solo letras y espacios).']);
+        }
+        try {
+            if (!$this->rutasModel->sindicatoValido($idSind)) {
+                $this->json(['success' => false, 'message' => 'Seleccione primero un sindicato válido.']);
+            }
+            $s = $this->rutasModel->crearDestino($idSind, $nombre);
+            $this->json(['success' => true, 'id' => (int)$s['id_sucursal'], 'label' => $s['ciudad_sucursal'] . ' (' . $s['nombre_sucursal'] . ')']);
+        } catch (PDOException $e) {
+            $this->errorBd($e, 'crearDestino');
+        }
+    }
 
     public function actualizar() {
         $this->acceso(true);

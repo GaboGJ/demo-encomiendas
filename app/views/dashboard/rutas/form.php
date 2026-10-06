@@ -61,23 +61,23 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
                       <input type="text" class="form-control bg-gray-100" value="<?= $h($ru['nombre_sindicato']) ?>" readonly>
                     </div>
                   <?php else: ?>
-                    <label class="form-label text-xs font-weight-bold mb-0">Sucursal de Destino *</label>
-                    <div class="input-group input-group-outline is-filled my-1">
-                      <select class="form-control" name="id_destino" required>
-                        <option value="" disabled selected>Seleccione el destino...</option>
-                        <?php foreach ($destinos as $s): ?>
-                          <option value="<?= (int)$s['id_sucursal'] ?>"><?= $h($s['ciudad_sucursal'] . ' (' . $s['nombre_sucursal'] . ')') ?></option>
-                        <?php endforeach; ?>
-                      </select>
+                           
+                                       <label class="form-label text-xs font-weight-bold mb-0 mt-2">Sindicato de la Ruta *</label>
+                    <div class="position-relative my-1">
+                      <div class="input-group input-group-outline is-filled">
+                        <input type="text" class="form-control" id="acSindicato" placeholder="Escriba para buscar el sindicato..." autocomplete="off">
+                      </div>
+                      <input type="hidden" name="id_sindicato" id="hidSindicato">
+                      <div id="listaSindicato" class="autocompletar-lista list-group position-absolute w-100 shadow-sm border-radius-md mt-1"></div>
                     </div>
-                    <label class="form-label text-xs font-weight-bold mb-0 mt-2">Sindicato de la Ruta *</label>
-                    <div class="input-group input-group-outline is-filled my-1">
-                      <select class="form-control" name="id_sindicato" required>
-                        <?php if (count($sindicatos) !== 1): ?><option value="" disabled selected>Seleccione el sindicato...</option><?php endif; ?>
-                        <?php foreach ($sindicatos as $s): ?>
-                          <option value="<?= (int)$s['id_sindicato'] ?>" <?= (int)$s['id_sindicato'] === (int)($_SESSION['id_sindicato'] ?? 0) ? 'selected' : '' ?>><?= $sinTxt($s) ?></option>
-                        <?php endforeach; ?>
-                      </select>
+                                 <label class="form-label text-xs font-weight-bold mb-0">Sucursal de Destino *</label>
+                    <div class="position-relative my-1">
+                      <div class="input-group input-group-outline is-filled">
+                        <input type="text" class="form-control" id="acDestino" placeholder="Escriba para buscar el destino..." autocomplete="off">
+                        <button type="button" class="btn btn-sm bg-gradient-success mb-0 px-2" id="btnNuevoDestino" title="Crear nuevo destino"><i class="material-symbols-rounded text-sm">add</i></button>
+                      </div>
+                      <input type="hidden" name="id_destino" id="hidDestino">
+                      <div id="listaDestino" class="autocompletar-lista list-group position-absolute w-100 shadow-sm border-radius-md mt-1"></div>
                     </div>
                   <?php endif; ?>
 
@@ -230,8 +230,61 @@ $sinTxt    = function ($s) use ($h) { return $h($s['nombre_sindicato'] . ($s['si
     render();
   });
 
+  // Autocompletar (solo en modo nuevo). crearAutocompletar vive en script.php, que carga después de esta vista.
+  document.addEventListener('DOMContentLoaded', function () {
+    const inpD = document.getElementById('acDestino');
+    if (!inpD) return;
+    const norm = s => String(s).toLowerCase();
+    const DESTINOS = <?= json_encode(array_map(function ($s) {
+        $l = $s['ciudad_sucursal'] . ' (' . $s['nombre_sucursal'] . ')';
+        return ['id' => (int)$s['id_sucursal'], 'label' => $l, 'buscar' => mb_strtolower($l, 'UTF-8')];
+    }, $destinos ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
+    const SINDICATOS = <?= json_encode(array_map(function ($s) {
+        $l = $s['nombre_sindicato'] . ($s['sigla_sindicato'] ? ' (' . $s['sigla_sindicato'] . ')' : '');
+        return ['id' => (int)$s['id_sindicato'], 'label' => $l, 'buscar' => mb_strtolower($l, 'UTF-8')];
+    }, $sindicatos ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
+
+    crearAutocompletar({ inputId: 'acDestino', listaId: 'listaDestino', hiddenId: 'hidDestino', data: DESTINOS });
+    crearAutocompletar({ inputId: 'acSindicato', listaId: 'listaSindicato', hiddenId: 'hidSindicato', data: SINDICATOS });
+
+    // Sindicato por defecto: el de la sesión (si está en la lista)
+    const miSind = <?= (int)($_SESSION['id_sindicato'] ?? 0) ?>;
+    const ini = SINDICATOS.find(s => s.id === miSind) || (SINDICATOS.length === 1 ? SINDICATOS[0] : null);
+    if (ini) { document.getElementById('acSindicato').value = ini.label; document.getElementById('hidSindicato').value = ini.id; }
+
+    document.getElementById('btnNuevoDestino').addEventListener('click', function () {
+      const idSind = document.getElementById('hidSindicato').value;
+      if (!idSind) { Swal.fire({ icon: 'warning', title: 'Falta el sindicato', text: 'Seleccione primero el sindicato de la ruta.' }); return; }
+
+      Swal.fire({
+        title: 'Nuevo destino', input: 'text', inputLabel: 'Nombre del destino (ciudad)',
+        inputAttributes: { maxlength: 50 }, showCancelButton: true,
+        confirmButtonText: 'Crear', cancelButtonText: 'Cancelar',
+        inputValidator: v => (v || '').trim().length < 2 ? 'Ingrese el nombre del destino.' : null
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        const fd = new FormData();
+        fd.append('id_sindicato', idSind);
+        fd.append('nombre', r.value.trim());
+        fetch(baseUrl + '/rutas/crearDestino', { method: 'POST', body: fd })
+          .then(x => x.json())
+          .then(res => {
+            if (!res.success) { Swal.fire('No se pudo crear', res.message, 'error'); return; }
+            if (!DESTINOS.some(d => d.id === res.id)) DESTINOS.push({ id: res.id, label: res.label, buscar: norm(res.label) });
+            inpD.value = res.label;
+            document.getElementById('hidDestino').value = res.id;
+          })
+          .catch(() => Swal.fire('Error', 'Ocurrió un error en el servidor', 'error'));
+      });
+    });
+  });
+
   btn.addEventListener('click', function () {
     if (!form.reportValidity()) return;
+
+    const eD = form.elements.id_destino, eS = form.elements.id_sindicato;
+    if (eD && !eD.value) { Swal.fire({ icon: 'warning', title: 'Falta el destino', text: 'Seleccione un destino de la lista o cree uno nuevo.' }); return; }
+    if (eS && !eS.value) { Swal.fire({ icon: 'warning', title: 'Falta el sindicato', text: 'Seleccione un sindicato de la lista.' }); return; }
 
     const incompleta = tarifas.findIndex(t => !t.id_contenido || !t.peso_max || !t.precio);
     if (incompleta !== -1) {

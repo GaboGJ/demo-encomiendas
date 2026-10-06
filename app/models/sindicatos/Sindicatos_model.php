@@ -196,6 +196,7 @@ class Sindicatos_model {
         $stmt->execute();
         return $stmt->rowCount() > 0;
     }
+    
 
     private function parametros($d) {
         return [

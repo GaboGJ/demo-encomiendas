@@ -374,5 +374,22 @@ class Rutas_model {
             throw $e;
         }
     }
+
+        /** Crea un destino (sucursal) para el sindicato; si ya existe esa ciudad en el sindicato, lo reutiliza. */
+    public function crearDestino($id_sindicato, $nombre) {
+        $st = $this->pdo->prepare(
+            "SELECT id_sucursal, ciudad_sucursal, nombre_sucursal FROM sucursales
+             WHERE id_sindicato = :s AND LOWER(ciudad_sucursal) = :c AND delete_sucursal IS NULL LIMIT 1"
+        );
+        $st->execute([':s' => $id_sindicato, ':c' => mb_strtolower($nombre, 'UTF-8')]);
+        if ($f = $st->fetch(PDO::FETCH_ASSOC)) return $f;
+
+        $this->pdo->prepare(
+            "INSERT INTO sucursales (id_sindicato, nombre_sucursal, ciudad_sucursal, direccion_sucursal, estado_sucursal, create_sucursal)
+             VALUES (:s, 'Agencia', :c, 'Sin dirección', 1, NOW())"
+        )->execute([':s' => $id_sindicato, ':c' => $nombre]);
+
+        return ['id_sucursal' => (int)$this->pdo->lastInsertId(), 'ciudad_sucursal' => $nombre, 'nombre_sucursal' => 'Agencia'];
+    }
 }
 ?>
