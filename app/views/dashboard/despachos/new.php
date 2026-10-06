@@ -69,7 +69,7 @@
   const vehiculosChoferesData = <?= json_encode(array_map(function ($vc) {
       return [
           'id'     => $vc['id_vehiculo_chofer'],
-          'label'  => 'Unidad ' . $vc['numero_interno_vehiculo'] . ' (Placa: ' . $vc['placa_vehiculo'] . ') - Chofer: ' . $vc['nombre_chofer'] . ' · ' . $vc['nombre_sindicato'],
+          'label'  => 'Unidad ' . $vc['numero_interno_vehiculo'] . ' (Placa: ' . $vc['placa_vehiculo'] . ') - Chofer: ' . $vc['nombre_chofer'] . ($vc['titular'] ? ' (Titular)' : ' (Asignado)') . ' · ' . $vc['nombre_sindicato'],
           'buscar' => mb_strtolower(
               $vc['numero_interno_vehiculo'] . ' ' . $vc['placa_vehiculo'] . ' ' . $vc['nombre_chofer'] . ' ' . ($vc['nombre_modelo'] ?? '') . ' ' . $vc['nombre_sindicato'],
               'UTF-8'
@@ -80,9 +80,9 @@
   const sucursalesDestinoData = <?= json_encode(array_map(function ($s) {
       return [
           'id'          => $s['id_sucursal'],
-          'label'       => $s['ciudad_sucursal'] . ' - ' .$s['nombre_sucursal'],
+          'label'       => $s['ciudad_sucursal'] . ' - ' . $s['nombre_sucursal'] . ($s['nombre_sindicato'] ? ' · ' . $s['nombre_sindicato'] : ''),
           'precio_base' => $s['precio_base'],
-          'buscar'      => mb_strtolower($s['ciudad_sucursal'] . ' ' . $s['nombre_sucursal'], 'UTF-8')       ];   },$sucursalesDestino ?? []), JSON_UNESCAPED_UNICODE) ?>;
+          'buscar'      => mb_strtolower($s['ciudad_sucursal'] . ' ' . $s['nombre_sucursal'] . ' ' . ($s['nombre_sindicato'] ?? ''), 'UTF-8')];   },$sucursalesDestino ?? []), JSON_UNESCAPED_UNICODE) ?>;
 
   function escaparHtml(str) {
     const div = document.createElement('div');

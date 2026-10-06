@@ -67,12 +67,15 @@ class Despachos_model {
                     s.id_sucursal, 
                     s.nombre_sucursal, 
                     s.ciudad_sucursal,
-                    IFNULL(pp.base_precio_pasaje, 0.00) AS precio_base
+                    IFNULL(pp.base_precio_pasaje, 0.00) AS precio_base,
+                    sn.nombre_sindicato
                 FROM sucursales s
                 LEFT JOIN precios_pasajes pp 
                        ON pp.id_sucursal_origen = :id_origen 
                       AND pp.id_sucursal_destino = s.id_sucursal 
+                      AND pp.delete_precio_pasaje IS NULL
                       AND (pp.estado_precio_pasaje = 1 OR pp.estado_precio_pasaje IS NULL)
+                LEFT JOIN sindicatos sn ON pp.id_sindicato = sn.id_sindicato
                 WHERE s.id_sucursal != :id_origen 
                   AND (s.estado_sucursal = 1 OR s.estado_sucursal IS NULL)";
             $stmt = $this->pdo->prepare($sql);
@@ -95,6 +98,7 @@ class Despachos_model {
                         m.nombre_modelo,
                         m.total_asientos_modelo,
                         sn.nombre_sindicato,
+                        CAST(IFNULL(vc.titular_vehiculo_chofer, 0) AS UNSIGNED) AS titular,
                         CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS nombre_chofer
                     FROM vehiculos_choferes vc
                     INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo

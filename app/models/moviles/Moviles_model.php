@@ -227,10 +227,33 @@ class Moviles_model {
         $sql = "INSERT INTO vehiculos
                     (id_socio, id_modelo, placa_vehiculo, numero_interno_vehiculo, color_vehiculo, estado_vehiculo, create_vehiculo)
                 VALUES (:so, :m, :p, :n, :c, 1, NOW())";
-        $st = $this->pdo->prepare($sql);
+               $st = $this->pdo->prepare($sql);
         $st->execute($this->parametros($d));
-        return (int)$this->pdo->lastInsertId();
+        $id = (int)$this->pdo->lastInsertId();
+
+        // Titular: el id_chofer (tabla choferes) de la persona del socio, no el id_persona
+        $c = $this->pdo->prepare(
+            "SELECT ch.id_chofer FROM socios so
+             INNER JOIN choferes ch ON ch.id_persona = so.id_persona
+             WHERE so.id_socio = :so AND ch.delete_chofer IS NULL
+               AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
+             LIMIT 1"
+        );
+        $c->execute([':so' => $d['id_socio']]);
+        $idChofer = (int)$c->fetchColumn();
+
+        if ($idChofer > 0) {
+            $this->pdo->prepare(
+                "INSERT INTO vehiculos_choferes
+                    (id_vehiculo, id_chofer, titular_vehiculo_chofer, estado_vehiculo_chofer, create_vehiculo_chofer)
+                 VALUES (:v, :c, 1, 1, NOW())"
+            )->execute([':v' => $id, ':c' => $idChofer]);
+        }
+
+        return $id;
     }
+
+    /** Actualiza los datos (no toca estado). Solo móviles no eliminados. */
 
     /** Actualiza los datos (no toca estado). Solo móviles no eliminados. */
     public function actualizar($id, $d) {

@@ -104,6 +104,7 @@
                     <td class="py-3 px-3 align-middle">
                       <span class="text-xs font-weight-bold text-dark"><?= $h($m['socio_nombre']) ?></span>
                       <span class="d-block text-xxs text-secondary font-weight-bold"><?= $m['codigo_socio'] ? 'Cód. ' . $h($m['codigo_socio']) : 'Socio titular' ?> · <?= (int)$m['total_choferes'] ?> chofer(es)</span>
+<span class="d-block text-xxs text-success font-weight-bold"><?= $h($m['nombre_sindicato_socio']) ?></span>
                     </td>
                     <td class="align-middle text-center py-3 px-3">
                       <span class="text-sm font-weight-bolder text-dark"><?= (int)$m['total_asientos_modelo'] ?> Asientos</span>

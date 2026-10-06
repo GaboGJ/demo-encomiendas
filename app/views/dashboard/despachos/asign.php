@@ -625,9 +625,9 @@ $thFirst = $thBase . ' ps-4 ps-md-5 pe-3';
   }
 
   // Estado inicial de los botones aunque el modal aún no se haya abierto
-  $('#tablaPendientes .btn-sel').each(function () { pintarBoton(this); });
-
   document.addEventListener('DOMContentLoaded', function () {
+    // Estado inicial de los botones aunque el modal aún no se haya abierto
+    $('#tablaPendientes .btn-sel').each(function () { pintarBoton(this); });
     const inicial = Math.min(TOTAL_PASOS, Math.max(1, <?= (int)$pasoInicial ?>));
     document.getElementById('lblPasoMovil').textContent = 'Paso 1 de ' + TOTAL_PASOS + ' · ' + NOMBRES[0];
     if (inicial !== 1) irAlPasoDirecto(inicial);

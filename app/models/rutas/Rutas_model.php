@@ -52,7 +52,7 @@ class Rutas_model {
         try {
             return $this->pdo->query($this->baseSelect() .
                 "WHERE pp.delete_precio_pasaje IS NULL
-                 ORDER BY so.ciudad_sucursal ASC, sd.ciudad_sucursal ASC, sn.nombre_sindicato ASC")
+                 ORDER BY pp.id_precio_pasaje DESC")
                 ->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Rutas_model::getRutas: ' . $e->getMessage());

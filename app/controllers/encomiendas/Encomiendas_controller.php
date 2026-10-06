@@ -80,7 +80,7 @@ class Encomiendas_controller {
             exit;
         }
 
-        $contenidos = $this->encomiendasModel->getContenidosPorRuta($id_origen, $id_destino, $this->idSindicato());
+        $contenidos = $this->encomiendasModel->getContenidosPorRuta($id_origen, $id_destino);
         echo json_encode(['success' => true, 'data' => $contenidos]);
         exit;
     }
@@ -230,7 +230,7 @@ class Encomiendas_controller {
                 }
                 $b['peso'] = $peso;
 
-                $precio = $this->encomiendasModel->obtenerTarifa($id_sucursal_origen, $id_destino, $b['id_contenido'], $peso, $id_sindicato);
+                $precio = $this->encomiendasModel->obtenerTarifaPorId(intval($b['id_tarifa'] ?? 0), $id_sucursal_origen, $id_destino, $b['id_contenido'], $peso);
                 if ($precio === null) {
                     throw new InvalidArgumentException("Bulto #{$n}: no existe una tarifa para esa ruta, contenido" . ($peso > 0 ? ' y peso.' : '.'));
                 }

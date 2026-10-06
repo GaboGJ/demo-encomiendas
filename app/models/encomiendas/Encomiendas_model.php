@@ -71,30 +71,38 @@ class Encomiendas_model {
      * Contenidos/tarifas de una ruta (Origen -> Destino). Si se indica
      * $id_sindicato solo se consideran las tarifas de ese sindicato.
      */
-    public function getContenidosPorRuta($id_origen, $id_destino, $id_sindicato = 0) {
+     public function getContenidosPorRuta($id_origen, $id_destino) {
         try {
-            $sql = "SELECT DISTINCT 
-                        ec.id_encomienda_contenido, 
-                        ec.nombre_encomienda_contenido,
-                        te.precio_tarifa_encomienda
-                    FROM tarifas_encomiendas te
-                    INNER JOIN encomiendas_contenidos ec ON te.id_encomienda_contenido = ec.id_encomienda_contenido
-                    WHERE te.id_sucursal_origen = :origen 
-                      AND te.id_sucursal_destino = :destino
-                      AND te.delete_tarifa_encomienda IS NULL
-                      AND (te.estado_tarifa_encomienda = 1 OR te.estado_tarifa_encomienda IS NULL)
-                      AND (ec.estado_encomienda_contenido = 1 OR ec.estado_encomienda_contenido IS NULL)";
-            $params = [':origen' => $id_origen, ':destino' => $id_destino];
-            if ((int)$id_sindicato > 0) {
-                $sql .= " AND te.id_sindicato = :sind";
-                $params[':sind'] = (int)$id_sindicato;
-            }
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $st = $this->pdo->prepare(
+                "SELECT te.id_tarifa_encomienda, ec.id_encomienda_contenido, ec.nombre_encomienda_contenido,
+                        te.peso_minimo, te.peso_maximo, te.precio_tarifa_encomienda, sn.nombre_sindicato
+                 FROM tarifas_encomiendas te
+                 INNER JOIN encomiendas_contenidos ec ON te.id_encomienda_contenido = ec.id_encomienda_contenido
+                 INNER JOIN sindicatos sn ON te.id_sindicato = sn.id_sindicato AND sn.delete_sindicato IS NULL
+                 WHERE te.id_sucursal_origen = :o AND te.id_sucursal_destino = :d
+                   AND te.delete_tarifa_encomienda IS NULL
+                   AND (te.estado_tarifa_encomienda = 1 OR te.estado_tarifa_encomienda IS NULL)
+                   AND (ec.estado_encomienda_contenido = 1 OR ec.estado_encomienda_contenido IS NULL)
+                 ORDER BY sn.nombre_sindicato, ec.nombre_encomienda_contenido, te.peso_maximo");
+            $st->execute([':o' => $id_origen, ':d' => $id_destino]);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             return [];
         }
+    }
+
+    /** Precio de una tarifa concreta, validando ruta, contenido y (si hay peso) su rango. */
+    public function obtenerTarifaPorId($id_tarifa, $id_origen, $id_destino, $id_contenido, $peso = 0) {
+        $st = $this->pdo->prepare(
+            "SELECT precio_tarifa_encomienda, peso_minimo, peso_maximo FROM tarifas_encomiendas
+             WHERE id_tarifa_encomienda = :t AND id_sucursal_origen = :o AND id_sucursal_destino = :d
+               AND id_encomienda_contenido = :c AND delete_tarifa_encomienda IS NULL
+               AND (estado_tarifa_encomienda = 1 OR estado_tarifa_encomienda IS NULL)");
+        $st->execute([':t' => $id_tarifa, ':o' => $id_origen, ':d' => $id_destino, ':c' => $id_contenido]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return null;
+        if ((float)$peso > 0 && (((float)$r['peso_minimo'] > (float)$peso && $r['peso_minimo'] !== null) || (float)$r['peso_maximo'] < (float)$peso)) return null;
+        return floatval($r['precio_tarifa_encomienda']);
     }
 
     /** Catálogo de tipos de contenido sin filtrar por ruta (usado en la Recepción). */

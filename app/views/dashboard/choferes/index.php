@@ -111,7 +111,9 @@
                           <?= $h($iniciales($c)) ?>
                         </div>
                         <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm font-weight-bold text-dark"><?= $h($nombre) ?></h6>
+                          <h6 class="mb-0 text-sm font-weight-bold text-dark"><?= $h($nombre) ?>
+                            <span class="badge badge-sm <?= (int)$c['es_socio'] > 0 ? 'bg-gradient-info' : 'bg-gradient-secondary' ?> border-radius-pill ms-1"><?= (int)$c['es_socio'] > 0 ? 'Socio' : 'Chofer' ?></span>
+                          </h6>
                           <span class="text-xxs text-secondary font-weight-bold">C.I. <?= $h($c['carnet_persona']) ?> · Cel: <?= $h($c['telefono_persona']) ?></span>
                         </div>
                       </div>

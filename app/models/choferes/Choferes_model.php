@@ -41,6 +41,8 @@ class Choferes_model {
                     p.direccion_persona,
                     TRIM(CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona, ' ', IFNULL(p.apellido_materno_persona, ''))) AS nombre_completo,
                     DATEDIFF(c.vencimiento_licencia_chofer, CURDATE()) AS dias_vencimiento,
+                    (SELECT COUNT(*) FROM socios so
+                      WHERE so.id_persona = c.id_persona AND so.delete_socio IS NULL) AS es_socio,
                     (SELECT COUNT(*)
                        FROM vehiculos_choferes vc
                        INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo

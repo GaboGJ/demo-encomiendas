@@ -721,8 +721,9 @@ function abrirModalBulto() {
       if (res.success && res.data.length > 0) {
         let options = '<option value="" selected disabled>Seleccione Contenido / Tarifa</option>';
         res.data.forEach(item => {
-          options += `<option value="${item.id_encomienda_contenido}" data-precio="${item.precio_tarifa_encomienda}">
-            ${item.nombre_encomienda_contenido} - Bs. ${parseFloat(item.precio_tarifa_encomienda).toFixed(2)}
+          const rango = (item.peso_minimo !== null ? parseFloat(item.peso_minimo) + '–' : 'hasta ') + parseFloat(item.peso_maximo) + ' kg';
+          options += `<option value="${item.id_tarifa_encomienda}" data-contenido="${item.id_encomienda_contenido}" data-precio="${item.precio_tarifa_encomienda}">
+            ${item.nombre_encomienda_contenido} (${rango}) · ${item.nombre_sindicato} - Bs. ${parseFloat(item.precio_tarifa_encomienda).toFixed(2)}
           </option>`;
         });
         selectContenido.innerHTML = options;
@@ -758,7 +759,8 @@ function agregarBultoDesdeModal() {
 
   listaBultos.push({
     descripcion: descripcion,
-    id_contenido: idContenido,
+        id_tarifa: idContenido,
+    id_contenido: optionSelected.getAttribute('data-contenido'),
     nombre_contenido: nombreContenido,
     peso: peso,
     subtotal: precioTarifa
