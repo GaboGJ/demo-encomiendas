@@ -59,7 +59,7 @@ $lleno     = function ($campo) use ($mov) { return !empty($mov[$campo]) ? ' is-f
                       </div>
                     </div>
                   </div>
-                  <p class="text-xxs text-secondary mb-0 mt-1">El número de unidad no puede repetirse en su sindicato y la placa no puede repetirse en el sistema.</p>
+                  <p class="text-xxs text-secondary mb-0 mt-1">El número de unidad no puede repetirse dentro del sindicato del socio titular y la placa no puede repetirse en el sistema.</p>
                 </div>
               </div>
 
@@ -91,7 +91,7 @@ $lleno     = function ($campo) use ($mov) { return !empty($mov[$campo]) ? ' is-f
                           <option value="" disabled <?= $esEdicion ? '' : 'selected' ?>>Seleccione un socio...</option>
                           <?php foreach ($socios as $s): ?>
                             <option value="<?= (int)$s['id_socio'] ?>" <?= $esEdicion && (int)$s['id_socio'] === (int)$mov['id_socio'] ? 'selected' : '' ?>>
-                              <?= $h($s['nombre_socio'] . ($s['codigo_socio'] ? ' (' . $s['codigo_socio'] . ')' : '')) ?>
+                              <?= $h($s['nombre_socio'] . ($s['codigo_socio'] ? ' (' . $s['codigo_socio'] . ')' : '') . ' · ' . $s['nombre_sindicato']) ?>
                             </option>
                           <?php endforeach; ?>
                         </select>
@@ -99,7 +99,7 @@ $lleno     = function ($campo) use ($mov) { return !empty($mov[$campo]) ? ' is-f
                     </div>
                   </div>
                   <?php if (empty($socios)): ?>
-                    <p class="text-xxs text-warning font-weight-bold mb-0 mt-2">Su sindicato aún no tiene socios registrados; registre uno antes de crear móviles.</p>
+                    <p class="text-xxs text-warning font-weight-bold mb-0 mt-2">No hay socios activos registrados; registre uno antes de crear móviles.</p>
                   <?php endif; ?>
                 </div>
               </div>

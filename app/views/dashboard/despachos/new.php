@@ -69,9 +69,9 @@
   const vehiculosChoferesData = <?= json_encode(array_map(function ($vc) {
       return [
           'id'     => $vc['id_vehiculo_chofer'],
-          'label'  => 'Unidad ' . $vc['numero_interno_vehiculo'] . ' (Placa: ' . $vc['placa_vehiculo'] . ') - Chofer: ' .$vc['nombre_chofer'],
+          'label'  => 'Unidad ' . $vc['numero_interno_vehiculo'] . ' (Placa: ' . $vc['placa_vehiculo'] . ') - Chofer: ' . $vc['nombre_chofer'] . ' · ' . $vc['nombre_sindicato'],
           'buscar' => mb_strtolower(
-              $vc['numero_interno_vehiculo'] . ' ' .$vc['placa_vehiculo'] . ' ' . $vc['nombre_chofer'] . ' ' . ($vc['nombre_modelo'] ?? ''),
+              $vc['numero_interno_vehiculo'] . ' ' . $vc['placa_vehiculo'] . ' ' . $vc['nombre_chofer'] . ' ' . ($vc['nombre_modelo'] ?? '') . ' ' . $vc['nombre_sindicato'],
               'UTF-8'
           )
       ];

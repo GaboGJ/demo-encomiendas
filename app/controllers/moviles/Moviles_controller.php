@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../helpers/moviles/ValidarMoviles.php';
  *   /moviles/papelera         papelera    móviles eliminados (borrado suave)
  *   AJAX/JSON: detalle (GET) · guardar · actualizar · cambiarEstado · eliminar · restaurar (POST)
  *
- * Todo se filtra por el sindicato de la sesión (vehiculos -> socios.id_sindicato).
+ * Los móviles NO se filtran por sindicato: el socio titular puede ser de cualquier sindicato.
  */
 class Moviles_controller {
     private $movilesModel;
@@ -29,8 +29,8 @@ class Moviles_controller {
         $this->acceso(false);
 
         $this->vista('moviles/index', [
-            'moviles'       => $this->movilesModel->getMoviles($this->idSindicato()),
-            'totalPapelera' => $this->movilesModel->contarEliminados($this->idSindicato()),
+            'moviles'       => $this->movilesModel->getMoviles(),
+            'totalPapelera' => $this->movilesModel->contarEliminados(),
         ]);
     }
 
@@ -45,7 +45,7 @@ class Moviles_controller {
         $this->acceso(false);
 
         $id = intval($_GET['id'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
 
         if (!$movil) {
             Flash::set(false, 'El móvil no existe o fue eliminado.', 'Móvil no encontrado');
@@ -60,7 +60,7 @@ class Moviles_controller {
         $this->acceso(false);
 
         $this->vista('moviles/papelera', [
-            'eliminados' => $this->movilesModel->getEliminados($this->idSindicato()),
+            'eliminados' => $this->movilesModel->getEliminados(),
         ]);
     }
 
@@ -75,7 +75,7 @@ class Moviles_controller {
             $this->json(['success' => false, 'message' => 'Identificador de móvil no válido.']);
         }
 
-        $movil = $this->movilesModel->obtenerMovil($id, $this->idSindicato());
+        $movil = $this->movilesModel->obtenerMovil($id);
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
         }
@@ -109,7 +109,7 @@ class Moviles_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_vehiculo'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
         }
@@ -138,7 +138,7 @@ class Moviles_controller {
         $id     = intval($_POST['id_vehiculo'] ?? 0);
         $estado = intval($_POST['estado'] ?? 0) === 1 ? 1 : 0;
 
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
         }
@@ -166,7 +166,7 @@ class Moviles_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_vehiculo'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'No se pudo eliminar: el móvil no existe o ya fue eliminado.']);
         }
@@ -194,7 +194,7 @@ class Moviles_controller {
         $this->soloPost();
 
         $id = intval($_POST['id_vehiculo'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato(), true) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, true) : null;
         if (!$movil || $movil['delete_vehiculo'] === null) {
             $this->json(['success' => false, 'message' => 'El móvil no está en la papelera.']);
         }
@@ -202,7 +202,8 @@ class Moviles_controller {
         try {
             // Evita restaurar si otro móvil vigente tomó el mismo número/placa mientras estaba eliminado
             $dup = $this->movilesModel->buscarDuplicado(
-                $movil['numero_interno_vehiculo'], strtoupper((string)$movil['placa_vehiculo']), $this->idSindicato(), $id
+                $movil['numero_interno_vehiculo'], strtoupper((string)$movil['placa_vehiculo']),
+                (int)$movil['id_sindicato_socio'], $id
             );
             if ($dup) {
                 $this->json(['success' => false, 'message' => $this->mensajeDuplicado($dup)]);
@@ -219,11 +220,12 @@ class Moviles_controller {
             $this->errorBd($e, 'restaurar');
         }
     }
-        /** AJAX GET ?id=: móvil + choferes activos con su estado de asignación. */
+
+    /** AJAX GET ?id=: móvil + choferes activos con su estado de asignación. */
     public function choferesAsignacion() {
         $this->acceso(true);
         $id = intval($_GET['id'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
         }
@@ -234,13 +236,13 @@ class Moviles_controller {
         ]);
     }
 
-        /** AJAX POST: id_vehiculo + ids_json (["3","7"]). El titular lo define el servidor (socio titular del móvil). */
+    /** AJAX POST: id_vehiculo + ids_json (["3","7"]). El titular lo define el servidor (socio titular del móvil). */
     public function guardarChoferes() {
         $this->acceso(true);
         $this->soloPost();
 
         $id = intval($_POST['id_vehiculo'] ?? 0);
-        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id, $this->idSindicato()) : null;
+        $movil = $id > 0 ? $this->movilesModel->obtenerMovil($id) : null;
         if (!$movil) {
             $this->json(['success' => false, 'message' => 'El móvil no existe o fue eliminado.']);
         }
@@ -261,33 +263,31 @@ class Moviles_controller {
 
     /* ============================ PRIVADOS ============================ */
 
-    private function idSindicato() {
-        return (int)($_SESSION['id_sindicato'] ?? 0);
-    }
-
     private function datosFormulario() {
         return [
-            'socios'  => $this->movilesModel->getSociosActivos($this->idSindicato()),
+            'socios'  => $this->movilesModel->getSociosActivos(),
             'modelos' => $this->movilesModel->getModelosActivos(),
         ];
     }
 
-    /** Formato + pertenencia del socio al sindicato + existencia del modelo. Responde JSON si falla. */
+    /** Formato + socio válido (de cualquier sindicato) + existencia del modelo. Responde JSON si falla. */
     private function validarDatos(array $d) {
         $error = ValidarMoviles::validar($d);
         if ($error !== null) {
             $this->json(['success' => false, 'message' => $error]);
         }
-        if (!$this->movilesModel->socioPerteneceASindicato($d['id_socio'], $this->idSindicato())) {
-            $this->json(['success' => false, 'message' => 'El socio seleccionado no pertenece a su sindicato.']);
+        if (!$this->movilesModel->socioValido($d['id_socio'])) {
+            $this->json(['success' => false, 'message' => 'El socio seleccionado no existe o está inactivo.']);
         }
         if (!$this->movilesModel->modeloExiste($d['id_modelo'])) {
             $this->json(['success' => false, 'message' => 'El modelo seleccionado no existe.']);
         }
     }
 
+    /** El número de unidad es único dentro del sindicato del socio titular; la placa, global. */
     private function validarDuplicado(array $d, $excluirId = 0) {
-        $dup = $this->movilesModel->buscarDuplicado($d['numero'], $d['placa'], $this->idSindicato(), $excluirId);
+        $idSindicato = $this->movilesModel->getSindicatoDeSocio($d['id_socio']);
+        $dup = $this->movilesModel->buscarDuplicado($d['numero'], $d['placa'], $idSindicato, $excluirId);
         if ($dup) {
             $this->json(['success' => false, 'message' => $this->mensajeDuplicado($dup)]);
         }
@@ -313,7 +313,7 @@ class Moviles_controller {
     private function mensajeDuplicado(array $dup) {
         return $dup['campo'] === 'placa'
             ? 'Ya existe un móvil registrado con esa placa.'
-            : 'Ya existe un móvil con ese número de unidad en su sindicato.';
+            : 'Ya existe un móvil con ese número de unidad en el sindicato del socio titular.';
     }
 
     /** Nunca se expone el SQL al cliente. */

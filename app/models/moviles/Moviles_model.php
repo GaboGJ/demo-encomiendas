@@ -3,14 +3,13 @@
  * Moviles_model
  * CRUD de vehículos (móviles) con borrado suave (delete_vehiculo + estado_vehiculo = 0).
  *
- * Notas de la BD:
- *  - vehiculos no tiene sindicato propio: pertenece al sindicato de su socio titular
- *    (vehiculos.id_socio -> socios.id_sindicato). Todas las consultas filtran por ese sindicato.
+ * Notas:
+ *  - Los móviles NO se filtran por sindicato: el socio titular puede ser de cualquier sindicato.
  *  - La BD no tiene UNIQUE en placa ni número interno, así que los duplicados se validan aquí
- *    (solo contra vehículos no eliminados).
+ *    (solo contra vehículos no eliminados). El número de unidad es único dentro del sindicato
+ *    del socio titular; la placa es única en todo el sistema.
  *  - Despachos_model::getVehiculosChoferes filtra por estado_vehiculo, por eso al desactivar
- *    o eliminar se deja estado_vehiculo = 0: el móvil deja de ofrecerse para nuevos turnos.
- * Las lecturas devuelven [] / null ante error; las escrituras dejan subir la PDOException.
+ *    o eliminar se deja estado_vehiculo = 0.
  */
 class Moviles_model {
     private $pdo;
@@ -23,7 +22,7 @@ class Moviles_model {
         }
     }
 
-    /** SELECT base: vehículo + modelo + socio titular + conteo de choferes vigentes. */
+    /** SELECT base: vehículo + modelo + socio titular (+ su sindicato) + conteo de choferes vigentes. */
     private function baseSelect() {
         return "SELECT
                     v.id_vehiculo,
@@ -39,6 +38,8 @@ class Moviles_model {
                     m.nombre_modelo,
                     m.total_asientos_modelo,
                     so.codigo_socio,
+                    so.id_sindicato AS id_sindicato_socio,
+                    sn.nombre_sindicato AS nombre_sindicato_socio,
                     CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS socio_nombre,
                     (SELECT COUNT(*) FROM vehiculos_choferes vc
                       WHERE vc.id_vehiculo = v.id_vehiculo
@@ -46,62 +47,52 @@ class Moviles_model {
                         AND vc.delete_vehiculo_chofer IS NULL) AS total_choferes
                 FROM vehiculos v
                 INNER JOIN socios so   ON v.id_socio = so.id_socio
+                INNER JOIN sindicatos sn ON so.id_sindicato = sn.id_sindicato
                 INNER JOIN personas p  ON so.id_persona = p.id_persona
                 INNER JOIN modelos m   ON v.id_modelo = m.id_modelo ";
     }
 
     /* ---------------- Lecturas ---------------- */
 
-    /** Móviles no eliminados (activos e inactivos) del sindicato. */
-    public function getMoviles($id_sindicato) {
+    /** Móviles no eliminados (activos e inactivos). */
+    public function getMoviles() {
         try {
-            $sql = $this->baseSelect() . "WHERE so.id_sindicato = :s AND v.delete_vehiculo IS NULL
-                                          ORDER BY v.id_vehiculo DESC";
-            $st = $this->pdo->prepare($sql);
-            $st->execute([':s' => $id_sindicato]);
-            return $st->fetchAll(PDO::FETCH_ASSOC);
+            $sql = $this->baseSelect() . "WHERE v.delete_vehiculo IS NULL ORDER BY v.id_vehiculo DESC";
+            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Moviles_model::getMoviles: ' . $e->getMessage());
             return [];
         }
     }
 
-    /** Papelera: móviles eliminados del sindicato, el más reciente primero. */
-    public function getEliminados($id_sindicato) {
+    /** Papelera: móviles eliminados, el más reciente primero. */
+    public function getEliminados() {
         try {
-            $sql = $this->baseSelect() . "WHERE so.id_sindicato = :s AND v.delete_vehiculo IS NOT NULL
-                                          ORDER BY v.delete_vehiculo DESC";
-            $st = $this->pdo->prepare($sql);
-            $st->execute([':s' => $id_sindicato]);
-            return $st->fetchAll(PDO::FETCH_ASSOC);
+            $sql = $this->baseSelect() . "WHERE v.delete_vehiculo IS NOT NULL ORDER BY v.delete_vehiculo DESC";
+            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('Moviles_model::getEliminados: ' . $e->getMessage());
             return [];
         }
     }
 
-    public function contarEliminados($id_sindicato) {
+    public function contarEliminados() {
         try {
-            $st = $this->pdo->prepare(
-                "SELECT COUNT(*) FROM vehiculos v INNER JOIN socios so ON v.id_socio = so.id_socio
-                 WHERE so.id_sindicato = :s AND v.delete_vehiculo IS NOT NULL"
-            );
-            $st->execute([':s' => $id_sindicato]);
-            return (int)$st->fetchColumn();
+            return (int)$this->pdo->query("SELECT COUNT(*) FROM vehiculos WHERE delete_vehiculo IS NOT NULL")->fetchColumn();
         } catch (PDOException $e) {
             return 0;
         }
     }
 
-    /** Un móvil del sindicato. Por defecto solo vigentes; $incluirEliminados = true para la papelera. */
-    public function obtenerMovil($id, $id_sindicato, $incluirEliminados = false) {
+    /** Un móvil. Por defecto solo vigentes; $incluirEliminados = true para la papelera. */
+    public function obtenerMovil($id, $incluirEliminados = false) {
         try {
-            $sql = $this->baseSelect() . "WHERE v.id_vehiculo = :id AND so.id_sindicato = :s";
+            $sql = $this->baseSelect() . "WHERE v.id_vehiculo = :id";
             if (!$incluirEliminados) {
                 $sql .= " AND v.delete_vehiculo IS NULL";
             }
             $st = $this->pdo->prepare($sql . " LIMIT 1");
-            $st->execute([':id' => $id, ':s' => $id_sindicato]);
+            $st->execute([':id' => $id]);
             return $st->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (PDOException $e) {
             error_log('Moviles_model::obtenerMovil: ' . $e->getMessage());
@@ -133,20 +124,19 @@ class Moviles_model {
         }
     }
 
-    /** Socios vigentes del sindicato (para el select de socio titular). */
-    public function getSociosActivos($id_sindicato) {
+    /** Socios vigentes de TODOS los sindicatos (para el select de socio titular). */
+    public function getSociosActivos() {
         try {
-            $sql = "SELECT so.id_socio, so.codigo_socio,
+            $sql = "SELECT so.id_socio, so.codigo_socio, so.id_sindicato, sn.nombre_sindicato,
                            CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS nombre_socio
                     FROM socios so
                     INNER JOIN personas p ON so.id_persona = p.id_persona
-                    WHERE so.id_sindicato = :s
-                      AND (so.estado_socio = 1 OR so.estado_socio IS NULL)
+                    INNER JOIN sindicatos sn ON so.id_sindicato = sn.id_sindicato
+                    WHERE (so.estado_socio = 1 OR so.estado_socio IS NULL)
                       AND so.delete_socio IS NULL
-                    ORDER BY p.nombre_persona ASC, p.apellido_paterno_persona ASC";
-            $st = $this->pdo->prepare($sql);
-            $st->execute([':s' => $id_sindicato]);
-            return $st->fetchAll(PDO::FETCH_ASSOC);
+                      AND sn.delete_sindicato IS NULL
+                    ORDER BY sn.nombre_sindicato ASC, p.nombre_persona ASC, p.apellido_paterno_persona ASC";
+            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             return [];
         }
@@ -165,14 +155,21 @@ class Moviles_model {
         }
     }
 
-    /** ¿El socio es vigente y pertenece al sindicato? (evita asignar socios ajenos por POST). */
-    public function socioPerteneceASindicato($id_socio, $id_sindicato) {
+    /** ¿El socio existe, está vigente y activo? (sin importar su sindicato). */
+    public function socioValido($id_socio) {
         $st = $this->pdo->prepare(
             "SELECT COUNT(*) FROM socios
-             WHERE id_socio = :so AND id_sindicato = :s AND delete_socio IS NULL"
+             WHERE id_socio = :so AND delete_socio IS NULL AND (estado_socio = 1 OR estado_socio IS NULL)"
         );
-        $st->execute([':so' => $id_socio, ':s' => $id_sindicato]);
+        $st->execute([':so' => $id_socio]);
         return (int)$st->fetchColumn() > 0;
+    }
+
+    /** Sindicato al que pertenece el socio (0 si no existe). */
+    public function getSindicatoDeSocio($id_socio) {
+        $st = $this->pdo->prepare("SELECT id_sindicato FROM socios WHERE id_socio = :so LIMIT 1");
+        $st->execute([':so' => $id_socio]);
+        return (int)$st->fetchColumn();
     }
 
     public function modeloExiste($id_modelo) {
@@ -182,8 +179,8 @@ class Moviles_model {
     }
 
     /**
-     * ¿Otro móvil vigente usa ese número de unidad (dentro del sindicato) o esa placa (global)?
-     * $excluirId permite ignorar el propio registro al editar/restaurar.
+     * ¿Otro móvil vigente usa ese número de unidad (dentro del sindicato indicado, el del socio
+     * titular) o esa placa (global)? $excluirId ignora el propio registro al editar/restaurar.
      * @return array|null ['campo' => 'numero'|'placa']
      */
     public function buscarDuplicado($numero, $placa, $id_sindicato, $excluirId = 0) {
@@ -294,7 +291,7 @@ class Moviles_model {
         ];
     }
 
-        /** Choferes activos para el modal de asignación, marcando los ya asignados a este móvil. */
+    /** Choferes activos para el modal de asignación, marcando los ya asignados a este móvil. */
     public function getChoferesParaAsignar($id_vehiculo) {
         try {
             $sql = "SELECT

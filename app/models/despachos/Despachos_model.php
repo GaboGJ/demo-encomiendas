@@ -94,15 +94,22 @@ class Despachos_model {
                         v.placa_vehiculo,
                         m.nombre_modelo,
                         m.total_asientos_modelo,
+                        sn.nombre_sindicato,
                         CONCAT(p.nombre_persona, ' ', p.apellido_paterno_persona) AS nombre_chofer
                     FROM vehiculos_choferes vc
                     INNER JOIN vehiculos v ON vc.id_vehiculo = v.id_vehiculo
+                    INNER JOIN socios so ON v.id_socio = so.id_socio
+                    INNER JOIN sindicatos sn ON so.id_sindicato = sn.id_sindicato
                     INNER JOIN modelos m ON v.id_modelo = m.id_modelo
                     INNER JOIN choferes ch ON vc.id_chofer = ch.id_chofer
                     INNER JOIN personas p ON ch.id_persona = p.id_persona
                     WHERE (vc.estado_vehiculo_chofer = 1 OR vc.estado_vehiculo_chofer IS NULL)
+                      AND vc.delete_vehiculo_chofer IS NULL
                       AND (v.estado_vehiculo = 1 OR v.estado_vehiculo IS NULL)
-                    ORDER BY v.numero_interno_vehiculo ASC";
+                      AND v.delete_vehiculo IS NULL
+                      AND ch.delete_chofer IS NULL
+                      AND (ch.estado_chofer = 1 OR ch.estado_chofer IS NULL)
+                    ORDER BY sn.nombre_sindicato ASC, v.numero_interno_vehiculo ASC";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
